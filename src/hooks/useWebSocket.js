@@ -6,8 +6,15 @@ export function useWebSocket(url) {
   const [error, setError] = useState(null);
   const messageHandlersRef = useRef({});
   const reconnectAttemptRef = useRef(0);
+  const abortControllerRef = useRef(new AbortController());
 
   const connect = useCallback(() => {
+    // Vorherige Verbindung abbrechen
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     // Exponential Backoff mit zufälliger Variation
     const baseTimeout = 1000;
     const timeout = Math.min(
@@ -18,7 +25,11 @@ export function useWebSocket(url) {
     reconnectAttemptRef.current++;
 
     try {
-      const websocket = new WebSocket(url);
+      const websocket = new WebSocket(url, [], {
+        // Zusätzliche WebSocket-Optionen
+        protocol: 'webrtc-room-protocol',
+        signal: abortControllerRef.current.signal
+      });
       
       websocket.onopen = () => {
         setIsConnected(true);
@@ -41,8 +52,10 @@ export function useWebSocket(url) {
           timestamp: new Date().toISOString()
         });
 
-        // Automatische Wiederverbindung
-        setTimeout(connect, timeout);
+        // Automatische Wiederverbindung nur bei unerwarteten Schließungen
+        if (!event.wasClean) {
+          setTimeout(connect, timeout);
+        }
       };
 
       websocket.onerror = (error) => {
@@ -64,7 +77,13 @@ export function useWebSocket(url) {
         try {
           const data = JSON.parse(event.data);
           const handlers = messageHandlersRef.current[data.type] || [];
-          handlers.forEach(handler => handler(data.data));
+          handlers.forEach(handler => {
+            try {
+              handler(data.data);
+            } catch (handlerError) {
+              console.error('Fehler bei Nachrichtenverarbeitung:', handlerError);
+            }
+          });
         } catch (err) {
           console.error('Nachrichtenverarbeitung fehlgeschlagen:', {
             error: err,
@@ -89,16 +108,28 @@ export function useWebSocket(url) {
     connect();
 
     return () => {
+      // Verbindung sicher schließen
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
       if (ws) {
-        ws.close();
+        ws.close(1000, 'Komponente unmounted');
       }
     };
   }, [connect]);
 
   const sendMessage = useCallback((message) => {
     if (ws?.readyState === WebSocket.OPEN) {
-      ws.send(JSON.stringify(message));
-      return true;
+      try {
+        ws.send(JSON.stringify(message));
+        return true;
+      } catch (error) {
+        console.warn('Nachrichtenversand fehlgeschlagen', {
+          error,
+          message
+        });
+        return false;
+      }
     }
     console.warn('Nachricht konnte nicht gesendet werden: WebSocket nicht offen', {
       readyState: ws?.readyState,
