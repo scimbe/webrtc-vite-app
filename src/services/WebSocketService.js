@@ -1,11 +1,17 @@
 export class WebSocketService {
-  constructor(url) {
+  constructor(url, options = {}) {
     this.url = url;
+    this.options = {
+      maxReconnectAttempts: 5,
+      reconnectTimeout: 1000,
+      priorityQueueSize: 100,
+      ...options
+    };
+    
     this.ws = null;
-    this.messageQueue = [];
+    this.normalQueue = [];
+    this.priorityQueue = [];
     this.reconnectAttempts = 0;
-    this.maxReconnectAttempts = 5;
-    this.reconnectTimeout = 1000;
     this.handlers = {
       open: [],
       close: [],
@@ -21,7 +27,7 @@ export class WebSocketService {
       this.ws = new WebSocket(this.url);
       this.setupEventHandlers();
     } catch (error) {
-      console.error('WebSocket connection failed:', error);
+      this.handleError(error);
       this.handleReconnect();
     }
   }
@@ -29,7 +35,7 @@ export class WebSocketService {
   setupEventHandlers() {
     this.ws.onopen = () => {
       this.reconnectAttempts = 0;
-      this.processMessageQueue();
+      this.processMessageQueues();
       this.handlers.open.forEach(handler => handler());
     };
 
@@ -39,33 +45,69 @@ export class WebSocketService {
     };
 
     this.ws.onmessage = (event) => {
-      const message = JSON.parse(event.data);
-      this.handlers.message.forEach(handler => handler(message));
+      try {
+        const message = JSON.parse(event.data);
+        this.handlers.message.forEach(handler => handler(message));
+      } catch (error) {
+        this.handleError(new Error('Invalid message format'));
+      }
     };
 
     this.ws.onerror = (error) => {
-      this.handlers.error.forEach(handler => handler(error));
+      this.handleError(error);
     };
   }
 
+  handleError(error) {
+    this.handlers.error.forEach(handler => handler(error));
+    if (this.options.onError) {
+      this.options.onError(error);
+    }
+  }
+
   handleReconnect() {
-    if (this.reconnectAttempts < this.maxReconnectAttempts) {
+    if (this.reconnectAttempts < this.options.maxReconnectAttempts) {
       this.reconnectAttempts++;
-      setTimeout(() => this.connect(), this.reconnectTimeout * this.reconnectAttempts);
+      if (this.options.onReconnect) {
+        this.options.onReconnect(this.reconnectAttempts);
+      }
+      setTimeout(
+        () => this.connect(),
+        this.options.reconnectTimeout * Math.pow(2, this.reconnectAttempts - 1)
+      );
     }
   }
 
-  send(message) {
+  send(message, priority = false) {
     if (this.ws?.readyState === WebSocket.OPEN) {
-      this.ws.send(JSON.stringify(message));
+      try {
+        this.ws.send(JSON.stringify(message));
+        return true;
+      } catch (error) {
+        this.handleError(error);
+        return false;
+      }
     } else {
-      this.messageQueue.push(message);
+      if (priority) {
+        if (this.priorityQueue.length < this.options.priorityQueueSize) {
+          this.priorityQueue.push(message);
+          return true;
+        }
+        return false;
+      }
+      this.normalQueue.push(message);
+      return true;
     }
   }
 
-  processMessageQueue() {
-    while (this.messageQueue.length > 0) {
-      const message = this.messageQueue.shift();
+  processMessageQueues() {
+    while (this.priorityQueue.length > 0) {
+      const message = this.priorityQueue.shift();
+      this.send(message, true);
+    }
+
+    while (this.normalQueue.length > 0) {
+      const message = this.normalQueue.shift();
       this.send(message);
     }
   }
