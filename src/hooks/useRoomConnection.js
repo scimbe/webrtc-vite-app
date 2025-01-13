@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from 'react';
 import { useWebSocket } from './useWebSocket';
 
-export function useRoomConnection(roomId, userId, isHost) {
+export function useRoomConnection(roomId, userName, isHost) {
   const [connectionState, setConnectionState] = useState('disconnected');
   const [participants, setParticipants] = useState([]);
   const wsUrl = `ws://localhost:3001/room/${roomId}`;
@@ -14,51 +14,46 @@ export function useRoomConnection(roomId, userId, isHost) {
       sendMessage({
         type: 'join',
         data: {
-          userId,
+          userId: userName,
+          userName,
           isHost,
           timestamp: new Date().toISOString()
         }
       });
     }
-  }, [isConnected, sendMessage, userId, isHost]);
-
-  const handleParticipantJoin = useCallback((participant) => {
-    setParticipants(prev => [...prev, participant]);
-    setConnectionState('connecting');
-
-    // Wenn Host, sende Raumstatus
-    if (isHost) {
-      sendMessage({
-        type: 'room_status',
-        data: {
-          participants: participants,
-          settings: {
-            maxParticipants: 2,
-            isLocked: false
-          }
-        }
-      });
-    }
-  }, [isHost, sendMessage, participants]);
-
-  const handleParticipantLeave = useCallback((participantId) => {
-    setParticipants(prev => prev.filter(p => p.userId !== participantId));
-  }, []);
+  }, [isConnected, sendMessage, userName, isHost]);
 
   useEffect(() => {
-    const cleanup = [
-      addMessageHandler('participant_joined', handleParticipantJoin),
-      addMessageHandler('participant_left', handleParticipantLeave),
+    const cleanupHandlers = [
       addMessageHandler('room_status', (status) => {
-        setParticipants(status.participants);
+        console.log('Room status received:', status);
+        setParticipants(status.participants || []);
+        setConnectionState('connected');
       }),
-      addMessageHandler('connection_state', (state) => {
-        setConnectionState(state);
+      addMessageHandler('participant_joined', (participant) => {
+        console.log('Participant joined:', participant);
+        setParticipants(prev => {
+          // Avoid duplicates
+          if (!prev.some(p => p.userId === participant.userId)) {
+            return [...prev, participant];
+          }
+          return prev;
+        });
+      }),
+      addMessageHandler('participant_left', (participant) => {
+        console.log('Participant left:', participant);
+        setParticipants(prev => prev.filter(p => p.userId !== participant.userId));
+      }),
+      addMessageHandler('error', (errorMsg) => {
+        console.error('Room connection error:', errorMsg);
+        setConnectionState('error');
       })
     ];
 
-    return () => cleanup.forEach(fn => fn());
-  }, [addMessageHandler, handleParticipantJoin, handleParticipantLeave]);
+    return () => {
+      cleanupHandlers.forEach(cleanup => cleanup());
+    };
+  }, [addMessageHandler]);
 
   const kickParticipant = useCallback((participantId) => {
     if (!isHost) return;
