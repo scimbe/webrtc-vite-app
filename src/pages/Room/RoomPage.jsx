@@ -4,7 +4,8 @@ import { VideoChat } from '../../components/VideoChat/VideoChat';
 import { WaitingRoom } from '../../components/Room/WaitingRoom';
 import { useMediaStream } from '../../hooks/useMediaStream';
 import { usePeerConnection } from '../../hooks/usePeerConnection';
-import { useRoom } from '../../hooks/useRoom';
+import { useRoomConnection } from '../../hooks/useRoomConnection';
+import { useRoomState } from '../../hooks/useRoomState';
 
 export const RoomPage = () => {
   const { roomId } = useParams();
@@ -16,21 +17,27 @@ export const RoomPage = () => {
   const [isInWaitingRoom, setIsInWaitingRoom] = useState(true);
   const { stream: localStream, error: mediaError } = useMediaStream();
   const { peerConnection, remoteStream } = usePeerConnection(localStream);
-  const roomHook = useRoom();
+  
+  const roomConnection = useRoomConnection(roomId, userName, isHost);
+  const roomState = useRoomState();
 
   useEffect(() => {
     if (!userName || !roomId) {
       navigate('/');
       return;
     }
+  }, [roomId, userName, navigate]);
 
-    // Raum initialisieren
-    if (isHost) {
-      roomHook.initializeAsHost(roomId);
-    } else {
-      roomHook.joinRoom(roomId);
+  // Handle connection state changes
+  useEffect(() => {
+    if (roomConnection.connectionState === 'failed') {
+      navigate('/', { 
+        state: { 
+          error: 'Verbindung zum Raum fehlgeschlagen'
+        }
+      });
     }
-  }, [roomId, userName, isHost, navigate, roomHook]);
+  }, [roomConnection.connectionState, navigate]);
 
   if (mediaError) {
     return (
@@ -69,7 +76,11 @@ export const RoomPage = () => {
         userName,
         isHost
       }}
-      {...roomHook}
+      connectionState={roomConnection.connectionState}
+      participants={roomConnection.participants}
+      onKickParticipant={roomConnection.kickParticipant}
+      onUpdateSettings={roomConnection.updateRoomSettings}
+      {...roomState}
     />
   );
 };
