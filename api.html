@@ -5,74 +5,60 @@
     <title>WebRTC Application API Documentation</title>
 </head>
 <body>
-    <h1>WebRTC Application API - Deployment & Optimization</h1>
+    <h1>WebRTC Application API - Enhanced UI Components</h1>
 
-    <h2>Configuration</h2>
+    <h2>VideoChat Component</h2>
     <section>
-        <h3>WebRTC Configuration</h3>
+        <h3>Properties</h3>
         <ul>
             <li>
-                <strong>ICE Server Setup:</strong>
-                <pre>{
-  iceServers: [
-    { urls: ['stun:...'] },
-    { 
-      urls: 'turn:...',
-      username: '...',
-      credential: '...'
-    }
-  ]
-}</pre>
-            </li>
-            <li>
-                <strong>Media Constraints:</strong>
-                <pre>{
-  video: {
-    width: { ideal: 1280 },
-    height: { ideal: 720 },
-    frameRate: { max: 30 }
-  },
-  audio: {
-    echoCancellation: true,
-    noiseSuppression: true,
-    autoGainControl: true
-  }
-}</pre>
-            </li>
-        </ul>
-    </section>
-
-    <h2>Enhanced usePeerConnection Hook</h2>
-    <section>
-        <h3>New Features</h3>
-        <ul>
-            <li>
-                <strong>Statistics Monitoring:</strong>
+                <strong>Props:</strong>
                 <ul>
-                    <li>Round Trip Time</li>
-                    <li>Available Bitrate</li>
-                    <li>Frame Rate</li>
-                    <li>Resolution</li>
+                    <li>peerConnection: RTCPeerConnection</li>
+                    <li>localStream: MediaStream</li>
+                    <li>remoteStream: MediaStream</li>
                 </ul>
             </li>
             <li>
-                <strong>Adaptive Bitrate:</strong>
+                <strong>State:</strong>
                 <ul>
-                    <li>Dynamic quality adjustment</li>
-                    <li>Network condition monitoring</li>
-                    <li>Bandwidth optimization</li>
+                    <li>settings: { video: boolean, audio: boolean, sharing: boolean, layout: string }</li>
+                    <li>participants: Array</li>
+                    <li>isMobile: boolean</li>
                 </ul>
             </li>
         </ul>
     </section>
 
-    <h2>Docker Setup</h2>
+    <h2>VideoStream Component</h2>
     <section>
-        <h3>Container Structure</h3>
+        <h3>Properties</h3>
         <ul>
-            <li>Frontend (Vite + React)</li>
-            <li>Signaling Server (Node.js)</li>
-            <li>TURN Server (coturn)</li>
+            <li>
+                <strong>Props:</strong>
+                <ul>
+                    <li>stream: MediaStream</li>
+                    <li>isMuted: boolean (default: false)</li>
+                    <li>isLocal: boolean (default: false)</li>
+                </ul>
+            </li>
+        </ul>
+    </section>
+
+    <h2>ControlPanel Component</h2>
+    <section>
+        <h3>Properties</h3>
+        <ul>
+            <li>
+                <strong>Props:</strong>
+                <ul>
+                    <li>settings: { video: boolean, audio: boolean }</li>
+                    <li>onToggleVideo: () => void</li>
+                    <li>onToggleAudio: () => void</li>
+                    <li>onEndCall: () => void</li>
+                    <li>className: string</li>
+                </ul>
+            </li>
         </ul>
     </section>
 </body>
