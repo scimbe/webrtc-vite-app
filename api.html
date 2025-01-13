@@ -7,72 +7,63 @@
 <body>
     <h1>WebRTC Application API</h1>
 
+    <h2>Hooks</h2>
+    <section>
+        <h3>usePeerConnection</h3>
+        <p>Hook für WebRTC Peer-to-Peer-Verbindungen</p>
+        <ul>
+            <li>
+                <strong>Parameters:</strong>
+                <ul>
+                    <li>localStream: MediaStream - Lokaler Audio/Video-Stream</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Returns:</strong>
+                <ul>
+                    <li>peerConnection: RTCPeerConnection</li>
+                    <li>remoteStream: MediaStream</li>
+                    <li>connectionState: string</li>
+                    <li>createOffer: () => Promise<RTCSessionDescriptionInit></li>
+                    <li>handleAnswer: (answer: RTCSessionDescriptionInit) => Promise<boolean></li>
+                    <li>handleOffer: (offer: RTCSessionDescriptionInit) => Promise<RTCSessionDescriptionInit></li>
+                    <li>addIceCandidate: (candidate: RTCIceCandidateInit) => Promise<boolean></li>
+                </ul>
+            </li>
+            <li>
+                <strong>Features:</strong>
+                <ul>
+                    <li>Automatische Verwaltung der Peer-Connection</li>
+                    <li>ICE-Kandidaten-Handling</li>
+                    <li>Stream-Management</li>
+                    <li>Verbindungsstatus-Updates</li>
+                </ul>
+            </li>
+        </ul>
+
+        <h3>useMediaStream</h3>
+        <p>Hook für Medienzugriff (bereits dokumentiert)</p>
+    </section>
+
     <h2>Components</h2>
     <section>
-        <h3>VideoChat</h3>
-        <p>Hauptkomponente für die Video-Chat-Funktionalität</p>
+        <h3>VideoChat (Updated)</h3>
+        <p>Hauptkomponente mit Peer-to-Peer-Funktionalität</p>
         <ul>
             <li>
                 <strong>State:</strong>
                 <ul>
                     <li>videoEnabled: boolean</li>
                     <li>audioEnabled: boolean</li>
+                    <li>connectionState: string</li>
                 </ul>
             </li>
             <li>
-                <strong>Features:</strong>
+                <strong>Methods:</strong>
                 <ul>
-                    <li>Video/Audio Toggle</li>
-                    <li>Picture-in-Picture Layout</li>
-                    <li>Responsives Design</li>
-                </ul>
-            </li>
-        </ul>
-
-        <h3>VideoStream</h3>
-        <p>Komponente zur Anzeige eines Videostreams</p>
-        <ul>
-            <li>
-                <strong>Props:</strong>
-                <ul>
-                    <li>stream: MediaStream</li>
-                    <li>isMuted: boolean</li>
-                    <li>isLocal: boolean</li>
-                </ul>
-            </li>
-        </ul>
-
-        <h3>Controls</h3>
-        <p>Steuerungselemente für Audio/Video</p>
-        <ul>
-            <li>
-                <strong>Props:</strong>
-                <ul>
-                    <li>videoEnabled: boolean</li>
-                    <li>audioEnabled: boolean</li>
-                    <li>onToggleVideo: () => void</li>
-                    <li>onToggleAudio: () => void</li>
-                </ul>
-            </li>
-        </ul>
-    </section>
-
-    <h2>Hooks</h2>
-    <section>
-        <h3>useMediaStream</h3>
-        <p>Erweiterter Hook für Medienzugriff</p>
-        <ul>
-            <li>
-                <strong>Parameters:</strong>
-                <ul>
-                    <li>options: { video: boolean, audio: boolean }</li>
-                </ul>
-            </li>
-            <li>
-                <strong>Returns:</strong>
-                <ul>
-                    <li>stream: MediaStream | null</li>
-                    <li>error: Error | null</li>
+                    <li>handleStartCall: () => Promise<void></li>
+                    <li>handleToggleVideo: () => void</li>
+                    <li>handleToggleAudio: () => void</li>
                 </ul>
             </li>
         </ul>
