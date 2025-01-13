@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <title>WebRTC Application API Documentation</title>
+</head>
+<body>
+    <h1>WebRTC Application API</h1>
+    <h2>Context Management API</h2>
+    <section>
+        <h3>ContextManager</h3>
+        <ul>
+            <li>
+                <strong>loadContext()</strong>
+                <p>Lädt den aktuellen Konversationskontext aus der memory_context.json</p>
+                <p>Returns: Promise<Context></p>
+            </li>
+            <li>
+                <strong>saveContext(context)</strong>
+                <p>Speichert den aktualisierten Kontext in memory_context.json</p>
+                <p>Parameters: context (Context)</p>
+                <p>Returns: Promise<boolean></p>
+            </li>
+        </ul>
+    </section>
+    <h2>WebRTC Hooks</h2>
+    <section>
+        <h3>useWebRTC</h3>
+        <ul>
+            <li>
+                <strong>useWebRTC()</strong>
+                <p>React Hook für WebRTC Funktionalität</p>
+                <p>Returns: { peerConnection: RTCPeerConnection }</p>
+            </li>
+        </ul>
+    </section>
+</body>
+</html>
