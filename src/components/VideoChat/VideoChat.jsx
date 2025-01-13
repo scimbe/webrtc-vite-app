@@ -1,75 +1,173 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { VideoStream } from './VideoStream';
 import { ControlPanel } from './ControlPanel';
-import { ConnectionStatus } from '../Status/ConnectionStatus';
 import { RoomInfo } from '../Room/RoomInfo';
 import { RoomControls } from '../Room/RoomControls';
-import { ParticipantList } from '../Room/ParticipantList';
-import { RoomSettings } from '../Room/RoomSettings';
 import { RoomChat } from '../Room/RoomChat';
 import { RoomInvite } from '../Room/RoomInvite';
-import { useRoom } from '../../hooks/useRoom';
+import { useRoomWebSocket } from '../../hooks/useRoomWebSocket';
 
-export const VideoChat = ({ 
-  peerConnection, 
-  localStream, 
+export const VideoChat = ({
+  localStream,
   remoteStream,
-  roomConfig 
+  peerConnection,
+  roomConfig
 }) => {
-  const {
-    participants,
-    isHost,
-    roomStatus,
-    lockRoom,
-    unlockRoom,
-    addParticipant,
-    removeParticipant
-  } = useRoom();
-
   const [settings, setSettings] = useState({
     video: true,
     audio: true
   });
 
   const [messages, setMessages] = useState([]);
+  const [participants, setParticipants] = useState([]);
+  const [roomSettings, setRoomSettings] = useState({
+    maxParticipants: 2,
+    isLocked: false,
+    allowChat: true
+  });
 
-  const handleSendMessage = (text) => {
-    const newMessage = {
-      text,
-      sender: roomConfig.userName,
-      timestamp: new Date().toISOString(),
-      isSelf: true
+  // WebSocket-Verbindung
+  const { status: connectionStatus, sendMessage, addMessageHandler } = useRoomWebSocket(
+    roomConfig.roomId,
+    roomConfig.userName,
+    {
+      joinMessage: {
+        type: 'join',
+        data: {
+          userId: roomConfig.userName,
+          userName: roomConfig.userName,
+          isHost: roomConfig.isHost
+        }
+      }
+    }
+  );
+
+  // WebRTC Signaling
+  useEffect(() => {
+    if (!peerConnection) return;
+
+    peerConnection.onicecandidate = (event) => {
+      if (event.candidate) {
+        participants.forEach(participant => {
+          if (participant.userId !== roomConfig.userName) {
+            sendMessage('webrtc_signal', {
+              target: participant.userId,
+              signal: {
+                type: 'candidate',
+                ...event.candidate
+              }
+            });
+          }
+        });
+      }
     };
-    setMessages(prev => [...prev, newMessage]);
-    // Hier würde die Nachricht über WebRTC DataChannel gesendet werden
-  };
 
-  const toggleVideo = () => {
+    const cleanup = addMessageHandler('webrtc_signal', ({ signal, sender }) => {
+      if (signal.type === 'offer') {
+        peerConnection.setRemoteDescription(new RTCSessionDescription(signal))
+          .then(() => peerConnection.createAnswer())
+          .then(answer => peerConnection.setLocalDescription(answer))
+          .then(() => {
+            sendMessage('webrtc_signal', {
+              target: sender,
+              signal: peerConnection.localDescription
+            });
+          })
+          .catch(error => console.error('Error handling offer:', error));
+      } else if (signal.type === 'answer') {
+        peerConnection.setRemoteDescription(new RTCSessionDescription(signal))
+          .catch(error => console.error('Error handling answer:', error));
+      } else if (signal.type === 'candidate') {
+        peerConnection.addIceCandidate(new RTCIceCandidate(signal))
+          .catch(error => console.error('Error handling ICE candidate:', error));
+      }
+    });
+
+    return cleanup;
+  }, [peerConnection, participants, sendMessage, addMessageHandler, roomConfig.userName]);
+
+  // Room Status Handler
+  useEffect(() => {
+    const cleanup = addMessageHandler('room_status', ({ participants: newParticipants, settings }) => {
+      setParticipants(newParticipants);
+      setRoomSettings(settings);
+
+      // Initiiere Verbindung wenn neuer Teilnehmer
+      if (roomConfig.isHost && newParticipants.length > 1 && peerConnection) {
+        const peer = newParticipants.find(p => p.userId !== roomConfig.userName);
+        if (peer) {
+          peerConnection.createOffer()
+            .then(offer => peerConnection.setLocalDescription(offer))
+            .then(() => {
+              sendMessage('webrtc_signal', {
+                target: peer.userId,
+                signal: peerConnection.localDescription
+              });
+            })
+            .catch(error => console.error('Error creating offer:', error));
+        }
+      }
+    });
+
+    return cleanup;
+  }, [addMessageHandler, roomConfig.isHost, roomConfig.userName, peerConnection, sendMessage]);
+
+  // Chat Handler
+  useEffect(() => {
+    const cleanup = addMessageHandler('chat_message', (message) => {
+      setMessages(prev => [...prev, message]);
+    });
+
+    return cleanup;
+  }, [addMessageHandler]);
+
+  // Media Controls
+  const toggleVideo = useCallback(() => {
     if (localStream) {
       localStream.getVideoTracks().forEach(track => {
         track.enabled = !settings.video;
       });
       setSettings(prev => ({ ...prev, video: !prev.video }));
     }
-  };
+  }, [localStream, settings.video]);
 
-  const toggleAudio = () => {
+  const toggleAudio = useCallback(() => {
     if (localStream) {
       localStream.getAudioTracks().forEach(track => {
         track.enabled = !settings.audio;
       });
       setSettings(prev => ({ ...prev, audio: !prev.audio }));
     }
-  };
+  }, [localStream, settings.audio]);
+
+  // Room Controls
+  const handleUpdateSettings = useCallback((newSettings) => {
+    if (roomConfig.isHost) {
+      sendMessage('update_settings', newSettings);
+    }
+  }, [roomConfig.isHost, sendMessage]);
+
+  const handleKickParticipant = useCallback((participantId) => {
+    if (roomConfig.isHost) {
+      sendMessage('kick_participant', { participantId });
+    }
+  }, [roomConfig.isHost, sendMessage]);
+
+  const handleSendMessage = useCallback((text) => {
+    if (roomSettings.allowChat) {
+      sendMessage('chat_message', { text });
+    }
+  }, [roomSettings.allowChat, sendMessage]);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800">
       <div className="container mx-auto p-4">
         {/* Header */}
-        <div className="mb-4 flex justify-between items-start">
+        <div className="mb-4 flex items-start justify-between">
           <RoomInfo 
             roomId={roomConfig.roomId}
             participants={participants}
+            connectionStatus={connectionStatus}
           />
           
           <div className="flex items-center space-x-2">
@@ -77,19 +175,15 @@ export const VideoChat = ({
             <RoomChat
               messages={messages}
               onSendMessage={handleSendMessage}
+              enabled={roomSettings.allowChat}
             />
-            <RoomSettings
-              roomStatus={roomStatus}
-              onUpdateSettings={(newSettings) => console.log('Update settings:', newSettings)}
-              isHost={isHost}
-            />
-            <RoomControls
-              isHost={isHost}
-              roomStatus={roomStatus}
-              onLockRoom={lockRoom}
-              onUnlockRoom={unlockRoom}
-              onKickParticipant={() => {}}
-            />
+            {roomConfig.isHost && (
+              <RoomControls
+                settings={roomSettings}
+                onUpdateSettings={handleUpdateSettings}
+                onKickParticipant={handleKickParticipant}
+              />
+            )}
           </div>
         </div>
 
@@ -107,7 +201,9 @@ export const VideoChat = ({
                   />
                 ) : (
                   <div className="flex items-center justify-center h-full text-slate-400">
-                    Warte auf Verbindung...
+                    {connectionStatus === 'connected' 
+                      ? 'Warte auf andere Teilnehmer...'
+                      : 'Verbindung wird hergestellt...'}
                   </div>
                 )}
               </div>
@@ -136,11 +232,24 @@ export const VideoChat = ({
 
           {/* Sidebar */}
           <div className="lg:col-span-1">
-            <ParticipantList
-              participants={participants}
-              onKickParticipant={removeParticipant}
-              isHost={isHost}
-            />
+            <div className="bg-slate-800 rounded-lg p-4">
+              <h2 className="text-xl font-bold text-white mb-4">Teilnehmer</h2>
+              <ul className="space-y-2">
+                {participants.map(participant => (
+                  <li 
+                    key={participant.userId}
+                    className="flex items-center justify-between py-2"
+                  >
+                    <span className="text-white">{participant.userName}</span>
+                    {participant.isHost && (
+                      <span className="text-xs bg-blue-500 text-white px-2 py-1 rounded">
+                        Host
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
           </div>
         </div>
       </div>
