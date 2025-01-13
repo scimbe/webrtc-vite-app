@@ -1,58 +1,56 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState } from 'react';
 import { VideoStream } from './VideoStream';
 import { Controls } from './Controls';
+import { ChatBox } from '../Chat/ChatBox';
 import { useMediaStream } from '../../hooks/useMediaStream';
 import { usePeerConnection } from '../../hooks/usePeerConnection';
-import { useWebSocket } from '../../hooks/useWebSocket';
+import { useDataChannel } from '../../hooks/useDataChannel';
 
 export const VideoChat = () => {
-  const [roomId] = useState(`room-${Math.random().toString(36).substr(2, 9)}`);
+  const [showChat, setShowChat] = useState(false);
   const { stream, error: mediaError } = useMediaStream();
-  const { status, sendMessage } = useWebSocket(`ws://localhost:3001/room/${roomId}`);
-
-  const handleIceCandidate = useCallback((candidate) => {
-    sendMessage('ice-candidate', { candidate });
-  }, [sendMessage]);
-
   const {
+    peerConnection,
     remoteStream,
     connectionState,
-    createOffer,
-    handleAnswer,
-    handleOffer,
-    addIceCandidate
-  } = usePeerConnection(stream, handleIceCandidate);
+    // ... andere props
+  } = usePeerConnection(stream);
 
-  // ... Rest der Komponenten-Implementation
+  const { messages, isOpen, sendMessage } = useDataChannel(peerConnection);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-gray-900 to-gray-800">
       <div className="container mx-auto p-4">
-        <div className="relative min-h-[calc(100vh-2rem)]">
-          {/* Status Anzeige */}
-          <div className="absolute top-4 left-4 z-10">
-            <div className="flex items-center space-x-2">
-              <span className={`w-3 h-3 rounded-full ${status.isConnected ? 'bg-green-500' : 'bg-red-500'}`} />
-              <span className="text-white text-sm">
-                {connectionState.charAt(0).toUpperCase() + connectionState.slice(1)}
-              </span>
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+          <div className="lg:col-span-2">
+            <div className="relative">
+              {/* Remote Stream */}
+              <div className="w-full aspect-video bg-gray-800 rounded-lg overflow-hidden shadow-lg mb-4">
+                {remoteStream ? (
+                  <VideoStream stream={remoteStream} />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-gray-400">
+                    Waiting for connection...
+                  </div>
+                )}
+              </div>
+
+              {/* Local Stream (Picture-in-Picture) */}
+              <div className="absolute top-4 right-4">
+                {stream && <VideoStream stream={stream} isMuted isLocal />}
+              </div>
+
+              <Controls />
             </div>
           </div>
 
-          {/* Remote Stream */}
-          <div className="w-full aspect-video bg-gray-800 rounded-lg overflow-hidden shadow-lg mb-4">
-            {remoteStream ? (
-              <VideoStream stream={remoteStream} />
-            ) : (
-              <div className="w-full h-full flex items-center justify-center text-gray-400">
-                Waiting for connection...
-              </div>
-            )}
-          </div>
-
-          {/* Local Stream (Picture-in-Picture) */}
-          <div className="absolute top-4 right-4">
-            {stream && <VideoStream stream={stream} isMuted isLocal />}
+          {/* Chat Section */}
+          <div className="lg:col-span-1 h-[calc(100vh-2rem)]">
+            <ChatBox
+              messages={messages}
+              onSendMessage={sendMessage}
+              isOpen={isOpen}
+            />
           </div>
         </div>
       </div>

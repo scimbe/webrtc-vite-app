@@ -5,9 +5,9 @@
     <title>WebRTC Application API Documentation</title>
 </head>
 <body>
-    <h1>WebRTC Application API - ICE Management</h1>
+    <h1>WebRTC Application API - Data Channel</h1>
 
-    <h2>useIceManagement Hook</h2>
+    <h2>useDataChannel Hook</h2>
     <section>
         <h3>Funktionalität</h3>
         <ul>
@@ -15,44 +15,58 @@
                 <strong>Parameters:</strong>
                 <ul>
                     <li>peerConnection: RTCPeerConnection - Die aktive Peer-Verbindung</li>
-                    <li>onIceCandidate: (candidate: RTCIceCandidate) => void - Callback für neue ICE-Kandidaten</li>
                 </ul>
             </li>
             <li>
                 <strong>Returns:</strong>
                 <ul>
-                    <li>addIceCandidate: (candidate: RTCIceCandidateInit) => Promise<boolean></li>
+                    <li>messages: Message[] - Liste der Chat-Nachrichten</li>
+                    <li>isOpen: boolean - Status des DataChannels</li>
+                    <li>sendMessage: (content: string, type?: string) => boolean</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Message Format:</strong>
+                <pre>{
+  id: number,
+  type: string,
+  content: string,
+  timestamp: string,
+  sender: 'local' | 'remote'
+}</pre>
+            </li>
+        </ul>
+    </section>
+
+    <h2>Chat Components</h2>
+    <section>
+        <h3>ChatBox</h3>
+        <ul>
+            <li>
+                <strong>Props:</strong>
+                <ul>
+                    <li>messages: Message[] - Liste der Nachrichten</li>
+                    <li>onSendMessage: (message: string) => void</li>
+                    <li>isOpen: boolean - Verbindungsstatus</li>
                 </ul>
             </li>
             <li>
                 <strong>Features:</strong>
                 <ul>
-                    <li>Automatische Verwaltung von ICE-Kandidaten</li>
-                    <li>Zwischenspeicherung von Kandidaten während des Verbindungsaufbaus</li>
-                    <li>Robuste Fehlerbehandlung</li>
+                    <li>Automatisches Scrollen</li>
+                    <li>Eingabevalidierung</li>
+                    <li>Verbindungsstatusanzeige</li>
                 </ul>
             </li>
         </ul>
-    </section>
 
-    <h2>Enhanced usePeerConnection Hook</h2>
-    <section>
-        <h3>Updates</h3>
+        <h3>Message</h3>
         <ul>
             <li>
-                <strong>Erweiterte Konfiguration:</strong>
+                <strong>Props:</strong>
                 <ul>
-                    <li>Mehrere STUN-Server</li>
-                    <li>ICE Transport Policy</li>
-                    <li>ICE Candidate Pool</li>
-                </ul>
-            </li>
-            <li>
-                <strong>Verbesserte Verbindungsstabilität:</strong>
-                <ul>
-                    <li>Automatische ICE-Kandidaten-Verwaltung</li>
-                    <li>Verbindungsstatus-Monitoring</li>
-                    <li>Fehlertolerante Implementierung</li>
+                    <li>message: Message - Nachrichtenobjekt</li>
+                    <li>isLocal: boolean - Lokale/Remote Nachricht</li>
                 </ul>
             </li>
         </ul>
