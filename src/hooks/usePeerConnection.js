@@ -1,64 +1,39 @@
 import { useState, useEffect, useCallback } from 'react';
 import { webrtcConfig } from '../config/webrtc';
 
-export function usePeerConnection(stream, options = {}) {
+export function usePeerConnection(localStream) {
   const [peerConnection, setPeerConnection] = useState(null);
-  const [stats, setStats] = useState(null);
+  const [remoteStream, setRemoteStream] = useState(null);
+  const [connectionState, setConnectionState] = useState('new');
 
-  // Statistik-Sammlung
   useEffect(() => {
-    if (!peerConnection) return;
+    const pc = new RTCPeerConnection(webrtcConfig);
 
-    const interval = setInterval(async () => {
-      const stats = await peerConnection.getStats();
-      const statsObj = {};
+    pc.ontrack = (event) => {
+      const [remoteStream] = event.streams;
+      setRemoteStream(remoteStream);
+    };
 
-      stats.forEach(stat => {
-        if (stat.type === 'candidate-pair' && stat.state === 'succeeded') {
-          statsObj.currentRoundTripTime = stat.currentRoundTripTime;
-          statsObj.availableOutgoingBitrate = stat.availableOutgoingBitrate;
-        }
-        if (stat.type === 'media-source') {
-          statsObj.frameRate = stat.framesPerSecond;
-          statsObj.resolution = `${stat.width}x${stat.height}`;
-        }
+    pc.onconnectionstatechange = () => {
+      setConnectionState(pc.connectionState);
+    };
+
+    if (localStream) {
+      localStream.getTracks().forEach(track => {
+        pc.addTrack(track, localStream);
       });
-
-      setStats(statsObj);
-    }, 1000);
-
-    return () => clearInterval(interval);
-  }, [peerConnection]);
-
-  // Adaptive Bitrate basierend auf Netzwerkbedingungen
-  useEffect(() => {
-    if (!peerConnection || !stats) return;
-
-    const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
-    if (!sender) return;
-
-    const parameters = sender.getParameters();
-    if (!parameters.encodings) return;
-
-    if (stats.currentRoundTripTime > 0.3) {
-      // Schlechte Verbindung - niedrigere Qualität
-      parameters.encodings[0].maxBitrate = 300000;
-    } else if (stats.currentRoundTripTime > 0.15) {
-      // Mittlere Verbindung
-      parameters.encodings[0].maxBitrate = 600000;
-    } else {
-      // Gute Verbindung
-      parameters.encodings[0].maxBitrate = 900000;
     }
 
-    sender.setParameters(parameters).catch(console.error);
-  }, [peerConnection, stats]);
+    setPeerConnection(pc);
 
-  // ... Rest der Implementation
+    return () => {
+      pc.close();
+    };
+  }, [localStream]);
 
   return {
     peerConnection,
-    stats,
-    // ... andere returns
+    remoteStream,
+    connectionState
   };
 }

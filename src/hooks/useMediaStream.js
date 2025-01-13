@@ -1,19 +1,18 @@
 import { useState, useEffect } from 'react';
+import { mediaConstraints } from '../config/webrtc';
 
-export const useMediaStream = ({ video = true, audio = true } = {}) => {
+export function useMediaStream() {
   const [stream, setStream] = useState(null);
   const [error, setError] = useState(null);
 
   useEffect(() => {
     async function enableStream() {
       try {
-        const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video,
-          audio
-        });
+        const mediaStream = await navigator.mediaDevices.getUserMedia(mediaConstraints);
         setStream(mediaStream);
         setError(null);
       } catch (err) {
+        console.error('Media stream error:', err);
         setError(err);
         setStream(null);
       }
@@ -26,7 +25,7 @@ export const useMediaStream = ({ video = true, audio = true } = {}) => {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, [video, audio]);
+  }, [stream]);
 
   return { stream, error };
-};
+}
