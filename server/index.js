@@ -4,18 +4,39 @@ import { WebSocketServer } from 'ws';
 import cors from 'cors';
 import { fileURLToPath } from 'url';
 import { dirname } from 'path';
-import path from 'path';
-import RoomManager from './RoomManager.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const app = express();
-app.use(cors());
+
+// Umfassende CORS-Konfiguration
+app.use(cors({
+  origin: '*', // In Produktion spezifische Origins angeben
+  methods: ['GET', 'POST', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
+}));
+
 app.use(express.json());
 
+// Debugging-Route
+app.get('/health', (req, res) => {
+  res.json({ status: 'Server is running' });
+});
+
 const server = createServer(app);
-const wss = new WebSocketServer({ server });
+
+// WebSocket-Konfiguration mit erweiterten Optionen
+const wss = new WebSocketServer({ 
+  server,
+  clientTracking: true,
+  verifyClient: (info, done) => {
+    // Optional: Zusätzliche Verbindungsauthentifizierung
+    console.log('WebSocket connection attempt from:', info.req.headers.origin);
+    done(true);
+  }
+});
+
 const roomManager = new RoomManager();
 
 // WebSocket-Verbindungen nach Raum-ID
@@ -33,7 +54,17 @@ const broadcastToRoom = (roomId, message, excludeUserId = null) => {
   });
 };
 
+// Zusätzliche Fehlerbehandlung für Server und WebSocket
+server.on('error', (error) => {
+  console.error('HTTP Server Error:', error);
+});
+
+wss.on('error', (error) => {
+  console.error('WebSocket Server Error:', error);
+});
+
 wss.on('connection', (ws, req) => {
+  console.log('New WebSocket connection');
   const roomId = req.url.split('/').pop();
   let userId = null;
 
@@ -182,6 +213,7 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
+    console.log('WebSocket connection closed');
     if (userId && roomId) {
       try {
         roomManager.leaveRoom(roomId, userId);
@@ -210,11 +242,13 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('error', (error) => {
-    console.error('WebSocket error:', error);
+    console.error('WebSocket connection error:', error);
   });
 });
 
 const PORT = process.env.PORT || 3001;
-server.listen(PORT, () => {
-  console.log(`Server läuft auf Port ${PORT}`);
+const HOST = process.env.HOST || '0.0.0.0';
+
+server.listen(PORT, HOST, () => {
+  console.log(`Server läuft auf ${HOST}:${PORT}`);
 });
