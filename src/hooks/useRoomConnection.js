@@ -4,7 +4,9 @@ import { useWebSocket } from './useWebSocket';
 export function useRoomConnection(roomId, userName, isHost) {
   const [connectionState, setConnectionState] = useState('disconnected');
   const [participants, setParticipants] = useState([]);
-  const wsUrl = `ws://localhost:3001/room/${roomId}`;
+  
+  // Dynamische WebSocket-URL
+  const wsUrl = `ws://${window.location.hostname}:3001/room/${roomId}`;
   
   const { isConnected, sendMessage, addMessageHandler, error: wsError } = useWebSocket(wsUrl);
 
