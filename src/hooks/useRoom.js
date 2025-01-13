@@ -1,53 +1,96 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback } from 'react';
 
 export function useRoom() {
-  const [participants, setParticipants] = useState([]);
-  const [isHost, setIsHost] = useState(false);
-  const [roomStatus, setRoomStatus] = useState({
-    isLocked: false,
-    maxParticipants: 2,
-    created: new Date().toISOString()
+  const [roomState, setRoomState] = useState({
+    id: null,
+    isHost: false,
+    participants: [],
+    settings: {
+      maxParticipants: 2,
+      isLocked: false,
+      allowChat: true,
+      requirePermission: false
+    }
   });
 
-  const lockRoom = useCallback(() => {
-    setRoomStatus(prev => ({
+  const initializeAsHost = useCallback((roomId) => {
+    setRoomState(prev => ({
       ...prev,
-      isLocked: true
+      id: roomId,
+      isHost: true,
+      participants: []
     }));
   }, []);
 
-  const unlockRoom = useCallback(() => {
-    setRoomStatus(prev => ({
+  const joinRoom = useCallback((roomId) => {
+    setRoomState(prev => ({
       ...prev,
-      isLocked: false
+      id: roomId,
+      isHost: false,
+      participants: []
+    }));
+  }, []);
+
+  const updateSettings = useCallback((newSettings) => {
+    setRoomState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        ...newSettings
+      }
     }));
   }, []);
 
   const addParticipant = useCallback((participant) => {
-    setParticipants(prev => {
-      if (prev.length >= roomStatus.maxParticipants) {
-        throw new Error('Room is full');
-      }
-      if (roomStatus.isLocked) {
+    setRoomState(prev => {
+      if (prev.settings.isLocked) {
         throw new Error('Room is locked');
       }
-      return [...prev, participant];
+      if (prev.participants.length >= prev.settings.maxParticipants) {
+        throw new Error('Room is full');
+      }
+      return {
+        ...prev,
+        participants: [...prev.participants, participant]
+      };
     });
-  }, [roomStatus.maxParticipants, roomStatus.isLocked]);
+  }, []);
 
   const removeParticipant = useCallback((participantId) => {
-    setParticipants(prev => 
-      prev.filter(p => p.id !== participantId)
-    );
+    setRoomState(prev => ({
+      ...prev,
+      participants: prev.participants.filter(p => p.id !== participantId)
+    }));
+  }, []);
+
+  const lockRoom = useCallback(() => {
+    setRoomState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        isLocked: true
+      }
+    }));
+  }, []);
+
+  const unlockRoom = useCallback(() => {
+    setRoomState(prev => ({
+      ...prev,
+      settings: {
+        ...prev.settings,
+        isLocked: false
+      }
+    }));
   }, []);
 
   return {
-    participants,
-    isHost,
-    roomStatus,
-    lockRoom,
-    unlockRoom,
+    ...roomState,
+    initializeAsHost,
+    joinRoom,
+    updateSettings,
     addParticipant,
-    removeParticipant
+    removeParticipant,
+    lockRoom,
+    unlockRoom
   };
 }
