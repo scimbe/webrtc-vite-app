@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 
-export const useMediaStream = () => {
+export const useMediaStream = ({ video = true, audio = true } = {}) => {
   const [stream, setStream] = useState(null);
   const [error, setError] = useState(null);
 
@@ -8,12 +8,14 @@ export const useMediaStream = () => {
     async function enableStream() {
       try {
         const mediaStream = await navigator.mediaDevices.getUserMedia({
-          video: true,
-          audio: true
+          video,
+          audio
         });
         setStream(mediaStream);
+        setError(null);
       } catch (err) {
         setError(err);
+        setStream(null);
       }
     }
 
@@ -24,7 +26,7 @@ export const useMediaStream = () => {
         stream.getTracks().forEach(track => track.stop());
       }
     };
-  }, []);
+  }, [video, audio]);
 
   return { stream, error };
 };

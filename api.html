@@ -7,70 +7,72 @@
 <body>
     <h1>WebRTC Application API</h1>
 
-    <h2>WebRTC Core Components</h2>
+    <h2>Components</h2>
     <section>
-        <h3>RTCPeerConnection</h3>
-        <p>Hauptkomponente für die Peer-to-Peer-Verbindung:</p>
-        <ul>
-            <li>Verwaltet die Verbindung zwischen Peers</li>
-            <li>Handhabt ICE-Kandidaten und Session-Beschreibungen</li>
-            <li>Koordiniert die Medienübertragung</li>
-        </ul>
-
-        <h3>MediaStream</h3>
-        <p>Verwaltet Audio- und Videostreams:</p>
-        <ul>
-            <li>Zugriff auf Kamera und Mikrofon</li>
-            <li>Stream-Verwaltung und Track-Kontrolle</li>
-            <li>Implementiert in useMediaStream Hook</li>
-        </ul>
-
-        <h3>RTCDataChannel</h3>
-        <p>Ermöglicht bidirektionale Datenkommunikation:</p>
-        <ul>
-            <li>Peer-to-Peer Datenaustausch</li>
-            <li>Konfigurierbare Übertragungsparameter</li>
-            <li>Ereignisbasierte Kommunikation</li>
-        </ul>
-    </section>
-
-    <h2>React Components</h2>
-    <section>
-        <h3>LocalStream Component</h3>
-        <p>Komponente zur Anzeige des lokalen Videostreams</p>
+        <h3>VideoChat</h3>
+        <p>Hauptkomponente für die Video-Chat-Funktionalität</p>
         <ul>
             <li>
-                <strong>Props:</strong> Keine erforderlich
-            </li>
-            <li>
-                <strong>Funktionen:</strong>
+                <strong>State:</strong>
                 <ul>
-                    <li>Automatischer Kamera- und Mikrofonzugriff</li>
-                    <li>Fehlerbehandlung bei Medienzugriff</li>
-                    <li>Automatisches Cleanup bei Komponenten-Unmount</li>
-                </ul>
-            </li>
-        </ul>
-    </section>
-
-    <h2>Custom Hooks</h2>
-    <section>
-        <h3>useMediaStream</h3>
-        <p>Hook für Medienzugriff und Stream-Verwaltung</p>
-        <ul>
-            <li>
-                <strong>Returns:</strong>
-                <ul>
-                    <li>stream: MediaStream | null</li>
-                    <li>error: Error | null</li>
+                    <li>videoEnabled: boolean</li>
+                    <li>audioEnabled: boolean</li>
                 </ul>
             </li>
             <li>
                 <strong>Features:</strong>
                 <ul>
-                    <li>Automatische Stream-Bereinigung</li>
-                    <li>Fehlerbehandlung</li>
-                    <li>Status-Management</li>
+                    <li>Video/Audio Toggle</li>
+                    <li>Picture-in-Picture Layout</li>
+                    <li>Responsives Design</li>
+                </ul>
+            </li>
+        </ul>
+
+        <h3>VideoStream</h3>
+        <p>Komponente zur Anzeige eines Videostreams</p>
+        <ul>
+            <li>
+                <strong>Props:</strong>
+                <ul>
+                    <li>stream: MediaStream</li>
+                    <li>isMuted: boolean</li>
+                    <li>isLocal: boolean</li>
+                </ul>
+            </li>
+        </ul>
+
+        <h3>Controls</h3>
+        <p>Steuerungselemente für Audio/Video</p>
+        <ul>
+            <li>
+                <strong>Props:</strong>
+                <ul>
+                    <li>videoEnabled: boolean</li>
+                    <li>audioEnabled: boolean</li>
+                    <li>onToggleVideo: () => void</li>
+                    <li>onToggleAudio: () => void</li>
+                </ul>
+            </li>
+        </ul>
+    </section>
+
+    <h2>Hooks</h2>
+    <section>
+        <h3>useMediaStream</h3>
+        <p>Erweiterter Hook für Medienzugriff</p>
+        <ul>
+            <li>
+                <strong>Parameters:</strong>
+                <ul>
+                    <li>options: { video: boolean, audio: boolean }</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Returns:</strong>
+                <ul>
+                    <li>stream: MediaStream | null</li>
+                    <li>error: Error | null</li>
                 </ul>
             </li>
         </ul>
