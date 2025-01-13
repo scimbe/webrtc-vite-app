@@ -5,7 +5,7 @@ import { RoomPage } from './pages/Room/RoomPage.jsx';
 
 function App() {
   return (
-    <Router>
+    <Router future={{ v7_startTransition: true, v7_relativeSplatPath: true }}>
       <Routes>
         <Route path="/" element={<RoomEntryPage />} />
         <Route path="/room/:roomId" element={<RoomPage />} />
