@@ -7,57 +7,69 @@
 <body>
     <h1>WebRTC Application API</h1>
 
-    <h2>Signaling Server API</h2>
+    <h2>WebSocket Integration</h2>
     <section>
-        <h3>WebSocket Events</h3>
+        <h3>WebSocketService</h3>
+        <p>Basis-Service für WebSocket-Kommunikation</p>
         <ul>
             <li>
-                <strong>join</strong>
-                <p>Client tritt einem Raum bei</p>
-                <pre>{ type: 'join', roomId: string, userId: string }</pre>
-            </li>
-            <li>
-                <strong>offer</strong>
-                <p>SDP-Angebot senden</p>
-                <pre>{ type: 'offer', data: RTCSessionDescription, target: string }</pre>
-            </li>
-            <li>
-                <strong>answer</strong>
-                <p>SDP-Antwort senden</p>
-                <pre>{ type: 'answer', data: RTCSessionDescription, target: string }</pre>
-            </li>
-            <li>
-                <strong>ice-candidate</strong>
-                <p>ICE-Kandidaten austauschen</p>
-                <pre>{ type: 'ice-candidate', data: RTCIceCandidate, target: string }</pre>
-            </li>
-        </ul>
-    </section>
-
-    <h2>React Integration</h2>
-    <section>
-        <h3>useSignaling Hook</h3>
-        <p>WebSocket-Verbindungsverwaltung</p>
-        <ul>
-            <li>
-                <strong>Returns:</strong>
+                <strong>Methods:</strong>
                 <ul>
-                    <li>connect: (roomId: string, userId: string) => void</li>
-                    <li>sendSignal: (type: string, data: any, target: string) => void</li>
-                    <li>on: (type: string, handler: Function) => () => void</li>
+                    <li>connect(): Verbindung herstellen</li>
+                    <li>send(message): Nachricht senden</li>
+                    <li>onOpen(handler): Event-Handler für Verbindungsaufbau</li>
+                    <li>onClose(handler): Event-Handler für Verbindungsabbau</li>
+                    <li>onMessage(handler): Event-Handler für eingehende Nachrichten</li>
+                    <li>onError(handler): Event-Handler für Fehler</li>
+                    <li>disconnect(): Verbindung beenden</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Features:</strong>
+                <ul>
+                    <li>Automatische Wiederverbindung</li>
+                    <li>Nachrichten-Queue</li>
+                    <li>Event-Handler-Management</li>
                 </ul>
             </li>
         </ul>
 
-        <h3>VideoChat Component (Updated)</h3>
-        <p>Integration des Signaling-Prozesses</p>
+        <h3>useWebSocket Hook</h3>
+        <p>React Hook für WebSocket-Integration</p>
         <ul>
             <li>
-                <strong>Features:</strong>
+                <strong>Parameters:</strong>
                 <ul>
-                    <li>Automatischer Raumbeitritt</li>
-                    <li>Offer/Answer-Austausch</li>
-                    <li>ICE-Kandidaten-Handling</li>
+                    <li>url: string - WebSocket-Server-URL</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Returns:</strong>
+                <ul>
+                    <li>isConnected: boolean - Verbindungsstatus</li>
+                    <li>lastMessage: any - Letzte empfangene Nachricht</li>
+                    <li>sendMessage: (type: string, payload: any) => void</li>
+                    <li>addMessageHandler: (type: string, handler: Function) => () => void</li>
+                </ul>
+            </li>
+        </ul>
+
+        <h3>useVideoChat Hook</h3>
+        <p>Hook für Video-Chat-Funktionalität</p>
+        <ul>
+            <li>
+                <strong>Parameters:</strong>
+                <ul>
+                    <li>roomId: string - Raum-Identifier</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Returns:</strong>
+                <ul>
+                    <li>isConnected: boolean - Verbindungsstatus</li>
+                    <li>peers: Map - Aktive Peer-Verbindungen</li>
+                    <li>handleSdpExchange: (peerId: string, sdp: RTCSessionDescription, type: string) => void</li>
+                    <li>handleIceCandidate: (peerId: string, candidate: RTCIceCandidate) => void</li>
                 </ul>
             </li>
         </ul>
