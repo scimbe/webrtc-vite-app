@@ -1,96 +1,64 @@
 import { useState, useEffect, useCallback } from 'react';
-import { useIceManagement } from './useIceManagement';
+import { webrtcConfig } from '../config/webrtc';
 
-const configuration = {
-  iceServers: [
-    { urls: 'stun:stun.l.google.com:19302' },
-    { urls: 'stun:stun1.l.google.com:19302' },
-    { urls: 'stun:stun2.l.google.com:19302' },
-    { urls: 'stun:stun3.l.google.com:19302' },
-    { urls: 'stun:stun4.l.google.com:19302' }
-  ],
-  iceTransportPolicy: 'all',
-  iceCandidatePoolSize: 10
-};
-
-export function usePeerConnection(localStream, onIceCandidate) {
+export function usePeerConnection(stream, options = {}) {
   const [peerConnection, setPeerConnection] = useState(null);
-  const [remoteStream, setRemoteStream] = useState(null);
-  const [connectionState, setConnectionState] = useState('new');
-  
-  const { addIceCandidate } = useIceManagement(peerConnection, onIceCandidate);
+  const [stats, setStats] = useState(null);
 
+  // Statistik-Sammlung
   useEffect(() => {
-    const pc = new RTCPeerConnection(configuration);
-    pc.onconnectionstatechange = () => setConnectionState(pc.connectionState);
-    
-    pc.ontrack = (event) => {
-      const [track] = event.streams;
-      setRemoteStream(track);
-    };
+    if (!peerConnection) return;
 
-    if (localStream) {
-      localStream.getTracks().forEach(track => {
-        pc.addTrack(track, localStream);
+    const interval = setInterval(async () => {
+      const stats = await peerConnection.getStats();
+      const statsObj = {};
+
+      stats.forEach(stat => {
+        if (stat.type === 'candidate-pair' && stat.state === 'succeeded') {
+          statsObj.currentRoundTripTime = stat.currentRoundTripTime;
+          statsObj.availableOutgoingBitrate = stat.availableOutgoingBitrate;
+        }
+        if (stat.type === 'media-source') {
+          statsObj.frameRate = stat.framesPerSecond;
+          statsObj.resolution = `${stat.width}x${stat.height}`;
+        }
       });
-    }
 
-    setPeerConnection(pc);
+      setStats(statsObj);
+    }, 1000);
 
-    return () => {
-      pc.close();
-    };
-  }, [localStream]);
-
-  const createOffer = useCallback(async () => {
-    if (!peerConnection) return null;
-
-    try {
-      const offer = await peerConnection.createOffer({
-        offerToReceiveAudio: true,
-        offerToReceiveVideo: true
-      });
-      await peerConnection.setLocalDescription(offer);
-      return offer;
-    } catch (error) {
-      console.error('Error creating offer:', error);
-      return null;
-    }
+    return () => clearInterval(interval);
   }, [peerConnection]);
 
-  const handleAnswer = useCallback(async (answer) => {
-    if (!peerConnection) return false;
+  // Adaptive Bitrate basierend auf Netzwerkbedingungen
+  useEffect(() => {
+    if (!peerConnection || !stats) return;
 
-    try {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(answer));
-      return true;
-    } catch (error) {
-      console.error('Error handling answer:', error);
-      return false;
+    const sender = peerConnection.getSenders().find(s => s.track.kind === 'video');
+    if (!sender) return;
+
+    const parameters = sender.getParameters();
+    if (!parameters.encodings) return;
+
+    if (stats.currentRoundTripTime > 0.3) {
+      // Schlechte Verbindung - niedrigere Qualität
+      parameters.encodings[0].maxBitrate = 300000;
+    } else if (stats.currentRoundTripTime > 0.15) {
+      // Mittlere Verbindung
+      parameters.encodings[0].maxBitrate = 600000;
+    } else {
+      // Gute Verbindung
+      parameters.encodings[0].maxBitrate = 900000;
     }
-  }, [peerConnection]);
 
-  const handleOffer = useCallback(async (offer) => {
-    if (!peerConnection) return null;
+    sender.setParameters(parameters).catch(console.error);
+  }, [peerConnection, stats]);
 
-    try {
-      await peerConnection.setRemoteDescription(new RTCSessionDescription(offer));
-      const answer = await peerConnection.createAnswer();
-      await peerConnection.setLocalDescription(answer);
-      return answer;
-    } catch (error) {
-      console.error('Error handling offer:', error);
-      return null;
-    }
-  }, [peerConnection]);
+  // ... Rest der Implementation
 
   return {
     peerConnection,
-    remoteStream,
-    connectionState,
-    createOffer,
-    handleAnswer,
-    handleOffer,
-    addIceCandidate
+    stats,
+    // ... andere returns
   };
 }

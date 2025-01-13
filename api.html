@@ -5,89 +5,74 @@
     <title>WebRTC Application API Documentation</title>
 </head>
 <body>
-    <h1>WebRTC Application API - Connection Management</h1>
+    <h1>WebRTC Application API - Deployment & Optimization</h1>
 
-    <h2>Connection State Management</h2>
+    <h2>Configuration</h2>
     <section>
-        <h3>useConnectionState Hook</h3>
+        <h3>WebRTC Configuration</h3>
         <ul>
             <li>
-                <strong>Parameters:</strong>
-                <ul>
-                    <li>peerConnection: RTCPeerConnection</li>
-                </ul>
-            </li>
-            <li>
-                <strong>Returns:</strong>
+                <strong>ICE Server Setup:</strong>
                 <pre>{
-  status: 'connected' | 'connecting' | 'disconnected' | 
-          'reconnecting' | 'failed' | 'negotiating',
-  error: Error | null,
-  lastActive: Date | null,
-  reconnectAttempts: number
+  iceServers: [
+    { urls: ['stun:...'] },
+    { 
+      urls: 'turn:...',
+      username: '...',
+      credential: '...'
+    }
+  ]
 }</pre>
             </li>
             <li>
-                <strong>Features:</strong>
-                <ul>
-                    <li>Automatische Statusaktualisierung</li>
-                    <li>Fehler-Tracking</li>
-                    <li>Reconnect-Zähler</li>
-                </ul>
+                <strong>Media Constraints:</strong>
+                <pre>{
+  video: {
+    width: { ideal: 1280 },
+    height: { ideal: 720 },
+    frameRate: { max: 30 }
+  },
+  audio: {
+    echoCancellation: true,
+    noiseSuppression: true,
+    autoGainControl: true
+  }
+}</pre>
             </li>
         </ul>
+    </section>
 
-        <h3>useReconnection Hook</h3>
+    <h2>Enhanced usePeerConnection Hook</h2>
+    <section>
+        <h3>New Features</h3>
         <ul>
             <li>
-                <strong>Parameters:</strong>
-                <pre>{
-  isConnected: boolean,
-  reconnectAttempts: number,
-  maxAttempts?: number,
-  onReconnect: () => void
-}</pre>
-            </li>
-            <li>
-                <strong>Returns:</strong>
+                <strong>Statistics Monitoring:</strong>
                 <ul>
-                    <li>canReconnect: boolean</li>
-                    <li>reconnect: () => boolean</li>
-                    <li>cancelReconnection: () => void</li>
+                    <li>Round Trip Time</li>
+                    <li>Available Bitrate</li>
+                    <li>Frame Rate</li>
+                    <li>Resolution</li>
                 </ul>
             </li>
             <li>
-                <strong>Features:</strong>
+                <strong>Adaptive Bitrate:</strong>
                 <ul>
-                    <li>Exponentielles Backoff</li>
-                    <li>Maximale Versuchsanzahl</li>
-                    <li>Automatische Wiederverbindung</li>
+                    <li>Dynamic quality adjustment</li>
+                    <li>Network condition monitoring</li>
+                    <li>Bandwidth optimization</li>
                 </ul>
             </li>
         </ul>
     </section>
 
-    <h2>UI Components</h2>
+    <h2>Docker Setup</h2>
     <section>
-        <h3>ConnectionStatus Component</h3>
+        <h3>Container Structure</h3>
         <ul>
-            <li>
-                <strong>Props:</strong>
-                <ul>
-                    <li>status: ConnectionStatus</li>
-                    <li>error: Error | null</li>
-                    <li>onRetry: () => void</li>
-                    <li>canReconnect: boolean</li>
-                </ul>
-            </li>
-            <li>
-                <strong>Features:</strong>
-                <ul>
-                    <li>Visuelle Statusanzeige</li>
-                    <li>Fehleranzeige</li>
-                    <li>Wiederverbindungsoptionen</li>
-                </ul>
-            </li>
+            <li>Frontend (Vite + React)</li>
+            <li>Signaling Server (Node.js)</li>
+            <li>TURN Server (coturn)</li>
         </ul>
     </section>
 </body>
