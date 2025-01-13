@@ -1,15 +1,19 @@
 import React from 'react';
-import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
-import Home from './pages/Home';
-import Room from './pages/Room';
+import { VideoChat } from './components/VideoChat/VideoChat';
+import { useMediaStream } from './hooks/useMediaStream';
+import { usePeerConnection } from './hooks/usePeerConnection';
 
-export default function App() {
+function App() {
+  const { stream: localStream } = useMediaStream();
+  const { peerConnection, remoteStream } = usePeerConnection(localStream);
+
   return (
-    <Router>
-      <Routes>
-        <Route path="/" element={<Home />} />
-        <Route path="/room" element={<Room />} />
-      </Routes>
-    </Router>
+    <VideoChat
+      peerConnection={peerConnection}
+      localStream={localStream}
+      remoteStream={remoteStream}
+    />
   );
 }
+
+export default App;
