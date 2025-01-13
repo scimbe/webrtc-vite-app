@@ -5,23 +5,38 @@ export function useWebSocket(url) {
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState(null);
   const messageHandlersRef = useRef({});
+  const reconnectTimeoutRef = useRef(null);
 
   const connect = useCallback(() => {
+    // Clear any existing timeout
+    if (reconnectTimeoutRef.current) {
+      clearTimeout(reconnectTimeoutRef.current);
+    }
+
     try {
       const websocket = new WebSocket(url);
       
       websocket.onopen = () => {
         setIsConnected(true);
         setError(null);
+        console.log('WebSocket connection established');
       };
 
-      websocket.onclose = () => {
+      websocket.onclose = (event) => {
         setIsConnected(false);
-        setTimeout(connect, 3000); // Reconnect attempt
+        console.warn('WebSocket connection closed:', event);
+        
+        // Exponential backoff for reconnection
+        const timeout = reconnectTimeoutRef.current ? 
+          Math.min(reconnectTimeoutRef.current * 2, 30000) : 1000;
+        
+        reconnectTimeoutRef.current = setTimeout(connect, timeout);
       };
 
       websocket.onerror = (error) => {
+        console.error('WebSocket error:', error);
         setError(error);
+        websocket.close();
       };
 
       websocket.onmessage = (event) => {
@@ -36,13 +51,24 @@ export function useWebSocket(url) {
 
       setWs(websocket);
     } catch (err) {
+      console.error('WebSocket connection error:', err);
       setError(err);
+      
+      // Retry connection
+      reconnectTimeoutRef.current = setTimeout(connect, 3000);
     }
   }, [url]);
 
   useEffect(() => {
     connect();
+
     return () => {
+      // Clear reconnect timeout
+      if (reconnectTimeoutRef.current) {
+        clearTimeout(reconnectTimeoutRef.current);
+      }
+
+      // Close WebSocket
       if (ws) {
         ws.close();
       }
@@ -54,6 +80,7 @@ export function useWebSocket(url) {
       ws.send(JSON.stringify(message));
       return true;
     }
+    console.warn('Cannot send message: WebSocket not open');
     return false;
   }, [ws]);
 
@@ -73,6 +100,7 @@ export function useWebSocket(url) {
     isConnected,
     error,
     sendMessage,
-    addMessageHandler
+    addMessageHandler,
+    ws
   };
 }

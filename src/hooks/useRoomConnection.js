@@ -6,7 +6,15 @@ export function useRoomConnection(roomId, userName, isHost) {
   const [participants, setParticipants] = useState([]);
   const wsUrl = `ws://localhost:3001/room/${roomId}`;
   
-  const { isConnected, sendMessage, addMessageHandler } = useWebSocket(wsUrl);
+  const { isConnected, sendMessage, addMessageHandler, error: wsError } = useWebSocket(wsUrl);
+
+  // Error handling
+  useEffect(() => {
+    if (wsError) {
+      console.error('WebSocket connection error:', wsError);
+      setConnectionState('error');
+    }
+  }, [wsError]);
 
   useEffect(() => {
     if (isConnected) {
@@ -20,6 +28,7 @@ export function useRoomConnection(roomId, userName, isHost) {
           timestamp: new Date().toISOString()
         }
       });
+      setConnectionState('connecting');
     }
   }, [isConnected, sendMessage, userName, isHost]);
 
