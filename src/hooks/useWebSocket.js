@@ -8,8 +8,13 @@ export function useWebSocket(url) {
   const reconnectAttemptRef = useRef(0);
 
   const connect = useCallback(() => {
-    // Exponential Backoff
-    const timeout = Math.min(1000 * Math.pow(2, reconnectAttemptRef.current), 30000);
+    // Exponential Backoff mit zufälliger Variation
+    const baseTimeout = 1000;
+    const timeout = Math.min(
+      baseTimeout * Math.pow(2, reconnectAttemptRef.current) + 
+      Math.random() * 500, 
+      30000
+    );
     reconnectAttemptRef.current++;
 
     try {
@@ -19,15 +24,21 @@ export function useWebSocket(url) {
         setIsConnected(true);
         setError(null);
         reconnectAttemptRef.current = 0;
-        console.log('WebSocket verbunden:', url);
+        console.log('WebSocket verbunden:', {
+          url,
+          timestamp: new Date().toISOString()
+        });
       };
 
       websocket.onclose = (event) => {
         setIsConnected(false);
         console.warn('WebSocket geschlossen:', {
-          reason: event.reason,
           code: event.code,
-          url: url
+          reason: event.reason,
+          wasClean: event.wasClean,
+          url,
+          reconnectAttempt: reconnectAttemptRef.current,
+          timestamp: new Date().toISOString()
         });
 
         // Automatische Wiederverbindung
@@ -36,9 +47,14 @@ export function useWebSocket(url) {
 
       websocket.onerror = (error) => {
         console.error('WebSocket Fehler:', {
-          error,
           url,
-          reconnectAttempt: reconnectAttemptRef.current
+          error: {
+            type: error.type,
+            target: error.target.toString(),
+            eventPhase: error.eventPhase
+          },
+          reconnectAttempt: reconnectAttemptRef.current,
+          timestamp: new Date().toISOString()
         });
         setError(error);
         websocket.close();
@@ -50,16 +66,20 @@ export function useWebSocket(url) {
           const handlers = messageHandlersRef.current[data.type] || [];
           handlers.forEach(handler => handler(data.data));
         } catch (err) {
-          console.error('Nachrichtenverarbeitung fehlgeschlagen:', err);
+          console.error('Nachrichtenverarbeitung fehlgeschlagen:', {
+            error: err,
+            rawData: event.data
+          });
         }
       };
 
       setWs(websocket);
     } catch (err) {
-      console.error('WebSocket Verbindungsfehler:', {
-        error: err,
+      console.error('WebSocket Verbindungsaufbau fehlgeschlagen:', {
         url,
-        reconnectAttempt: reconnectAttemptRef.current
+        error: err,
+        reconnectAttempt: reconnectAttemptRef.current,
+        timestamp: new Date().toISOString()
       });
       setError(err);
     }
@@ -80,7 +100,10 @@ export function useWebSocket(url) {
       ws.send(JSON.stringify(message));
       return true;
     }
-    console.warn('Nachricht konnte nicht gesendet werden: WebSocket nicht offen');
+    console.warn('Nachricht konnte nicht gesendet werden: WebSocket nicht offen', {
+      readyState: ws?.readyState,
+      message
+    });
     return false;
   }, [ws]);
 
