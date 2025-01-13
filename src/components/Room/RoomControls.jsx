@@ -1,43 +1,32 @@
 import React from 'react';
-import { Lock, Unlock, UserPlus, UserMinus } from 'lucide-react';
+import { Settings, Lock, Unlock } from 'lucide-react';
 
-export const RoomControls = ({
-  isHost,
-  roomStatus,
-  onLockRoom,
-  onUnlockRoom,
-  onKickParticipant,
-  className = ''
+export const RoomControls = ({ 
+  settings, 
+  onUpdateSettings, 
+  onKickParticipant 
 }) => {
-  if (!isHost) return null;
-
   return (
-    <div className={`flex items-center space-x-2 ${className}`}>
-      {roomStatus.isLocked ? (
-        <button
-          onClick={onUnlockRoom}
-          className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
-          title="Raum entsperren"
-        >
-          <Unlock className="w-5 h-5" />
-        </button>
-      ) : (
-        <button
-          onClick={onLockRoom}
-          className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
-          title="Raum sperren"
-        >
+    <div className="flex items-center space-x-2">
+      <button
+        onClick={() => onUpdateSettings({ isLocked: !settings.isLocked })}
+        className="p-2 rounded-lg bg-slate-700 hover:bg-slate-600 text-white transition-colors"
+        title={settings.isLocked ? 'Raum entsperren' : 'Raum sperren'}
+      >
+        {settings.isLocked ? (
           <Lock className="w-5 h-5" />
-        </button>
-      )}
+        ) : (
+          <Unlock className="w-5 h-5" />
+        )}
+      </button>
 
       <button
-        onClick={onKickParticipant}
-        className="p-2 rounded-lg bg-red-500 hover:bg-red-600 text-white transition-colors"
-        title="Teilnehmer entfernen"
+        onClick={() => onUpdateSettings({ allowChat: !settings.allowChat })}
+        className={`p-2 rounded-lg ${settings.allowChat ? 'bg-blue-500 hover:bg-blue-600' : 'bg-slate-700 hover:bg-slate-600'} text-white transition-colors`}
+        title={settings.allowChat ? 'Chat deaktivieren' : 'Chat aktivieren'}
       >
-        <UserMinus className="w-5 h-5" />
+        <Settings className="w-5 h-5" />
       </button>
     </div>
   );
-}
+};
