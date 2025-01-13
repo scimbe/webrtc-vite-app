@@ -5,68 +5,87 @@
     <title>WebRTC Application API Documentation</title>
 </head>
 <body>
-    <h1>WebRTC Application API - Data Channel</h1>
+    <h1>WebRTC Application API - Connection Management</h1>
 
-    <h2>useDataChannel Hook</h2>
+    <h2>Connection State Management</h2>
     <section>
-        <h3>Funktionalität</h3>
+        <h3>useConnectionState Hook</h3>
         <ul>
             <li>
                 <strong>Parameters:</strong>
                 <ul>
-                    <li>peerConnection: RTCPeerConnection - Die aktive Peer-Verbindung</li>
+                    <li>peerConnection: RTCPeerConnection</li>
                 </ul>
             </li>
             <li>
                 <strong>Returns:</strong>
-                <ul>
-                    <li>messages: Message[] - Liste der Chat-Nachrichten</li>
-                    <li>isOpen: boolean - Status des DataChannels</li>
-                    <li>sendMessage: (content: string, type?: string) => boolean</li>
-                </ul>
-            </li>
-            <li>
-                <strong>Message Format:</strong>
                 <pre>{
-  id: number,
-  type: string,
-  content: string,
-  timestamp: string,
-  sender: 'local' | 'remote'
+  status: 'connected' | 'connecting' | 'disconnected' | 
+          'reconnecting' | 'failed' | 'negotiating',
+  error: Error | null,
+  lastActive: Date | null,
+  reconnectAttempts: number
 }</pre>
             </li>
+            <li>
+                <strong>Features:</strong>
+                <ul>
+                    <li>Automatische Statusaktualisierung</li>
+                    <li>Fehler-Tracking</li>
+                    <li>Reconnect-Zähler</li>
+                </ul>
+            </li>
         </ul>
-    </section>
 
-    <h2>Chat Components</h2>
-    <section>
-        <h3>ChatBox</h3>
+        <h3>useReconnection Hook</h3>
         <ul>
             <li>
-                <strong>Props:</strong>
+                <strong>Parameters:</strong>
+                <pre>{
+  isConnected: boolean,
+  reconnectAttempts: number,
+  maxAttempts?: number,
+  onReconnect: () => void
+}</pre>
+            </li>
+            <li>
+                <strong>Returns:</strong>
                 <ul>
-                    <li>messages: Message[] - Liste der Nachrichten</li>
-                    <li>onSendMessage: (message: string) => void</li>
-                    <li>isOpen: boolean - Verbindungsstatus</li>
+                    <li>canReconnect: boolean</li>
+                    <li>reconnect: () => boolean</li>
+                    <li>cancelReconnection: () => void</li>
                 </ul>
             </li>
             <li>
                 <strong>Features:</strong>
                 <ul>
-                    <li>Automatisches Scrollen</li>
-                    <li>Eingabevalidierung</li>
-                    <li>Verbindungsstatusanzeige</li>
+                    <li>Exponentielles Backoff</li>
+                    <li>Maximale Versuchsanzahl</li>
+                    <li>Automatische Wiederverbindung</li>
                 </ul>
             </li>
         </ul>
+    </section>
 
-        <h3>Message</h3>
+    <h2>UI Components</h2>
+    <section>
+        <h3>ConnectionStatus Component</h3>
         <ul>
             <li>
                 <strong>Props:</strong>
                 <ul>
-                    <li>message: Message - Nachrichtenobjekt</li>
-                    <li>isLocal: boolean - Lokale/Remote Nachricht</li>
+                    <li>status: ConnectionStatus</li>
+                    <li>error: Error | null</li>
+                    <li>onRetry: () => void</li>
+                    <li>canReconnect: boolean</li>
+                </ul>
+            </li>
+            <li>
+                <strong>Features:</strong>
+                <ul>
+                    <li>Visuelle Statusanzeige</li>
+                    <li>Fehleranzeige</li>
+                    <li>Wiederverbindungsoptionen</li>
                 </ul>
             </li>
         </ul>
