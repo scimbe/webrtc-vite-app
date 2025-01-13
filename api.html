@@ -7,63 +7,57 @@
 <body>
     <h1>WebRTC Application API</h1>
 
-    <h2>Hooks</h2>
+    <h2>Signaling Server API</h2>
     <section>
-        <h3>usePeerConnection</h3>
-        <p>Hook für WebRTC Peer-to-Peer-Verbindungen</p>
+        <h3>WebSocket Events</h3>
         <ul>
             <li>
-                <strong>Parameters:</strong>
-                <ul>
-                    <li>localStream: MediaStream - Lokaler Audio/Video-Stream</li>
-                </ul>
+                <strong>join</strong>
+                <p>Client tritt einem Raum bei</p>
+                <pre>{ type: 'join', roomId: string, userId: string }</pre>
             </li>
+            <li>
+                <strong>offer</strong>
+                <p>SDP-Angebot senden</p>
+                <pre>{ type: 'offer', data: RTCSessionDescription, target: string }</pre>
+            </li>
+            <li>
+                <strong>answer</strong>
+                <p>SDP-Antwort senden</p>
+                <pre>{ type: 'answer', data: RTCSessionDescription, target: string }</pre>
+            </li>
+            <li>
+                <strong>ice-candidate</strong>
+                <p>ICE-Kandidaten austauschen</p>
+                <pre>{ type: 'ice-candidate', data: RTCIceCandidate, target: string }</pre>
+            </li>
+        </ul>
+    </section>
+
+    <h2>React Integration</h2>
+    <section>
+        <h3>useSignaling Hook</h3>
+        <p>WebSocket-Verbindungsverwaltung</p>
+        <ul>
             <li>
                 <strong>Returns:</strong>
                 <ul>
-                    <li>peerConnection: RTCPeerConnection</li>
-                    <li>remoteStream: MediaStream</li>
-                    <li>connectionState: string</li>
-                    <li>createOffer: () => Promise<RTCSessionDescriptionInit></li>
-                    <li>handleAnswer: (answer: RTCSessionDescriptionInit) => Promise<boolean></li>
-                    <li>handleOffer: (offer: RTCSessionDescriptionInit) => Promise<RTCSessionDescriptionInit></li>
-                    <li>addIceCandidate: (candidate: RTCIceCandidateInit) => Promise<boolean></li>
-                </ul>
-            </li>
-            <li>
-                <strong>Features:</strong>
-                <ul>
-                    <li>Automatische Verwaltung der Peer-Connection</li>
-                    <li>ICE-Kandidaten-Handling</li>
-                    <li>Stream-Management</li>
-                    <li>Verbindungsstatus-Updates</li>
+                    <li>connect: (roomId: string, userId: string) => void</li>
+                    <li>sendSignal: (type: string, data: any, target: string) => void</li>
+                    <li>on: (type: string, handler: Function) => () => void</li>
                 </ul>
             </li>
         </ul>
 
-        <h3>useMediaStream</h3>
-        <p>Hook für Medienzugriff (bereits dokumentiert)</p>
-    </section>
-
-    <h2>Components</h2>
-    <section>
-        <h3>VideoChat (Updated)</h3>
-        <p>Hauptkomponente mit Peer-to-Peer-Funktionalität</p>
+        <h3>VideoChat Component (Updated)</h3>
+        <p>Integration des Signaling-Prozesses</p>
         <ul>
             <li>
-                <strong>State:</strong>
+                <strong>Features:</strong>
                 <ul>
-                    <li>videoEnabled: boolean</li>
-                    <li>audioEnabled: boolean</li>
-                    <li>connectionState: string</li>
-                </ul>
-            </li>
-            <li>
-                <strong>Methods:</strong>
-                <ul>
-                    <li>handleStartCall: () => Promise<void></li>
-                    <li>handleToggleVideo: () => void</li>
-                    <li>handleToggleAudio: () => void</li>
+                    <li>Automatischer Raumbeitritt</li>
+                    <li>Offer/Answer-Austausch</li>
+                    <li>ICE-Kandidaten-Handling</li>
                 </ul>
             </li>
         </ul>
