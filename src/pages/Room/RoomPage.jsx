@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useParams, useSearchParams, useNavigate } from 'react-router-dom';
 import { VideoChat } from '../../components/VideoChat/VideoChat';
 import { WaitingRoom } from '../../components/Room/WaitingRoom';
@@ -18,27 +18,41 @@ export const RoomPage = () => {
   const { stream: localStream, error: mediaError } = useMediaStream();
   const { peerConnection, remoteStream } = usePeerConnection(localStream);
   
-  const roomConnection = useRoomConnection(roomId, userName, isHost);
-  const roomState = useRoomState();
+  const { 
+    connectionState, 
+    participants, 
+    isConnected, 
+    kickParticipant, 
+    updateRoomSettings 
+  } = useRoomConnection(roomId, userName, isHost);
 
+  // Validierung der Eingabeparameter
   useEffect(() => {
     if (!userName || !roomId) {
+      console.error('Fehlende erforderliche Parameter', { userName, roomId });
       navigate('/');
       return;
     }
   }, [roomId, userName, navigate]);
 
-  // Handle connection state changes
+  // Verbindungszustand überwachen
   useEffect(() => {
-    if (roomConnection.connectionState === 'failed') {
+    console.log('Verbindungszustand:', {
+      connectionState,
+      isConnected,
+      participants
+    });
+
+    if (connectionState === 'error') {
       navigate('/', { 
         state: { 
           error: 'Verbindung zum Raum fehlgeschlagen'
         }
       });
     }
-  }, [roomConnection.connectionState, navigate]);
+  }, [connectionState, isConnected, navigate, participants]);
 
+  // Medienfehler behandeln
   if (mediaError) {
     return (
       <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 flex items-center justify-center p-4">
@@ -56,6 +70,7 @@ export const RoomPage = () => {
     );
   }
 
+  // Warte-/Haupt-Raumansicht
   if (isInWaitingRoom) {
     return (
       <WaitingRoom
@@ -76,11 +91,11 @@ export const RoomPage = () => {
         userName,
         isHost
       }}
-      connectionState={roomConnection.connectionState}
-      participants={roomConnection.participants}
-      onKickParticipant={roomConnection.kickParticipant}
-      onUpdateSettings={roomConnection.updateRoomSettings}
-      {...roomState}
+      connectionState={connectionState}
+      participants={participants}
+      onKickParticipant={kickParticipant}
+      onUpdateSettings={updateRoomSettings}
+      isConnected={isConnected}
     />
   );
 };
