@@ -1,9 +1,10 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 
 export function useWebSocket(url) {
   const [ws, setWs] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState(null);
+  const messageHandlersRef = useRef({});
 
   const connect = useCallback(() => {
     try {
@@ -21,6 +22,16 @@ export function useWebSocket(url) {
 
       websocket.onerror = (error) => {
         setError(error);
+      };
+
+      websocket.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          const handlers = messageHandlersRef.current[data.type] || [];
+          handlers.forEach(handler => handler(data.data));
+        } catch (err) {
+          console.error('Error parsing message:', err);
+        }
       };
 
       setWs(websocket);
@@ -46,9 +57,22 @@ export function useWebSocket(url) {
     return false;
   }, [ws]);
 
+  const addMessageHandler = useCallback((type, handler) => {
+    if (!messageHandlersRef.current[type]) {
+      messageHandlersRef.current[type] = [];
+    }
+    messageHandlersRef.current[type].push(handler);
+
+    // Return a cleanup function
+    return () => {
+      messageHandlersRef.current[type] = messageHandlersRef.current[type].filter(h => h !== handler);
+    };
+  }, []);
+
   return {
     isConnected,
     error,
-    sendMessage
+    sendMessage,
+    addMessageHandler
   };
 }
