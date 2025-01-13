@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { RoomEntryPage } from './pages/Room/RoomEntryPage';
-import { RoomPage } from './pages/Room/RoomPage';
+import { RoomEntryPage } from './pages/Room/RoomEntryPage.jsx';
+import { RoomPage } from './pages/Room/RoomPage.jsx';
 
 function App() {
   return (
