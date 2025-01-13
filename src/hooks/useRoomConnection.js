@@ -1,27 +1,40 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import { useWebSocket } from './useWebSocket';
 
 export function useRoomConnection(roomId, userName, isHost) {
   const [connectionState, setConnectionState] = useState('disconnected');
   const [participants, setParticipants] = useState([]);
+  const userNameRef = useRef(userName);
+  const isHostRef = useRef(isHost);
   
   // Dynamische WebSocket-URL
   const wsUrl = `ws://${window.location.hostname}:3001/room/${roomId}`;
   
-  const { isConnected, sendMessage, addMessageHandler, error: wsError } = useWebSocket(wsUrl);
+  const { 
+    isConnected, 
+    sendMessage, 
+    addMessageHandler, 
+    error: wsError,
+    ws 
+  } = useWebSocket(wsUrl);
 
-  // Error handling
+  // Ref-Werte aktualisieren
   useEffect(() => {
-    if (wsError) {
-      console.error('WebSocket connection error:', wsError);
-      setConnectionState('error');
-    }
-  }, [wsError]);
+    userNameRef.current = userName;
+    isHostRef.current = isHost;
+  }, [userName, isHost]);
 
+  // WebSocket-Verbindungszustand
   useEffect(() => {
-    if (isConnected) {
-      // Initial room join
-      sendMessage({
+    console.log('WebSocket-Status:', {
+      isConnected,
+      readyState: ws?.readyState,
+      url: wsUrl
+    });
+
+    if (isConnected && ws?.readyState === WebSocket.OPEN) {
+      // Raum beitreten, wenn Verbindung hergestellt
+      const joinMessage = {
         type: 'join',
         data: {
           userId: userName,
@@ -29,22 +42,45 @@ export function useRoomConnection(roomId, userName, isHost) {
           isHost,
           timestamp: new Date().toISOString()
         }
-      });
-      setConnectionState('connecting');
-    }
-  }, [isConnected, sendMessage, userName, isHost]);
+      };
 
+      console.log('Sende Beitrittsnachricht:', joinMessage);
+      
+      // Nachricht mit Verzögerung senden, um Race Conditions zu vermeiden
+      const timeoutId = setTimeout(() => {
+        sendMessage(joinMessage);
+        setConnectionState('connecting');
+      }, 500);
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [isConnected, ws?.readyState, sendMessage, userName, isHost, wsUrl]);
+
+  // Fehlerbehandlung
+  useEffect(() => {
+    if (wsError) {
+      console.error('WebSocket-Verbindungsfehler:', {
+        error: wsError,
+        userName,
+        roomId,
+        isHost
+      });
+      setConnectionState('error');
+    }
+  }, [wsError, userName, roomId, isHost]);
+
+  // Nachrichtenhandler
   useEffect(() => {
     const cleanupHandlers = [
       addMessageHandler('room_status', (status) => {
-        console.log('Room status received:', status);
+        console.log('Raumstatus erhalten:', status);
         setParticipants(status.participants || []);
         setConnectionState('connected');
       }),
       addMessageHandler('participant_joined', (participant) => {
-        console.log('Participant joined:', participant);
+        console.log('Teilnehmer beigetreten:', participant);
         setParticipants(prev => {
-          // Avoid duplicates
+          // Duplikate vermeiden
           if (!prev.some(p => p.userId === participant.userId)) {
             return [...prev, participant];
           }
@@ -52,11 +88,11 @@ export function useRoomConnection(roomId, userName, isHost) {
         });
       }),
       addMessageHandler('participant_left', (participant) => {
-        console.log('Participant left:', participant);
+        console.log('Teilnehmer verlassen:', participant);
         setParticipants(prev => prev.filter(p => p.userId !== participant.userId));
       }),
       addMessageHandler('error', (errorMsg) => {
-        console.error('Room connection error:', errorMsg);
+        console.error('Raum-Verbindungsfehler:', errorMsg);
         setConnectionState('error');
       })
     ];
@@ -67,27 +103,27 @@ export function useRoomConnection(roomId, userName, isHost) {
   }, [addMessageHandler]);
 
   const kickParticipant = useCallback((participantId) => {
-    if (!isHost) return;
+    if (!isHostRef.current) return;
     
     sendMessage({
       type: 'kick_participant',
       data: { participantId }
     });
-  }, [isHost, sendMessage]);
+  }, [sendMessage]);
 
   const updateRoomSettings = useCallback((settings) => {
-    if (!isHost) return;
+    if (!isHostRef.current) return;
 
     sendMessage({
       type: 'update_settings',
       data: settings
     });
-  }, [isHost, sendMessage]);
+  }, [sendMessage]);
 
   return {
     connectionState,
     participants,
-    isConnected,
+    isConnected: isConnected && ws?.readyState === WebSocket.OPEN,
     kickParticipant,
     updateRoomSettings
   };
