@@ -5,62 +5,55 @@
     <title>WebRTC Application API Documentation</title>
 </head>
 <body>
-    <h1>WebRTC Application API - WebSocket Integration</h1>
+    <h1>WebRTC Application API - ICE Management</h1>
 
-    <h2>WebSocketService Updates</h2>
+    <h2>useIceManagement Hook</h2>
     <section>
-        <h3>Erweiterte Funktionen</h3>
+        <h3>Funktionalität</h3>
         <ul>
             <li>
-                <strong>Prioritäts-Queue:</strong>
+                <strong>Parameters:</strong>
                 <ul>
-                    <li>Unterstützung für priorisierte Nachrichten</li>
-                    <li>Separate Queues für normale und priorisierte Nachrichten</li>
-                    <li>Konfigurierbare Queue-Größe</li>
+                    <li>peerConnection: RTCPeerConnection - Die aktive Peer-Verbindung</li>
+                    <li>onIceCandidate: (candidate: RTCIceCandidate) => void - Callback für neue ICE-Kandidaten</li>
                 </ul>
             </li>
             <li>
-                <strong>Verbesserte Fehlerbehandlung:</strong>
+                <strong>Returns:</strong>
                 <ul>
-                    <li>Detaillierte Fehlerberichte</li>
-                    <li>Fehler-Callbacks</li>
-                    <li>Validierung von Nachrichten</li>
+                    <li>addIceCandidate: (candidate: RTCIceCandidateInit) => Promise<boolean></li>
                 </ul>
             </li>
             <li>
-                <strong>Erweiterte Wiederverbindungslogik:</strong>
+                <strong>Features:</strong>
                 <ul>
-                    <li>Exponentielles Backoff</li>
-                    <li>Status-Tracking</li>
-                    <li>Wiederverbindungs-Callbacks</li>
+                    <li>Automatische Verwaltung von ICE-Kandidaten</li>
+                    <li>Zwischenspeicherung von Kandidaten während des Verbindungsaufbaus</li>
+                    <li>Robuste Fehlerbehandlung</li>
                 </ul>
             </li>
         </ul>
     </section>
 
-    <h2>useWebSocket Hook Updates</h2>
+    <h2>Enhanced usePeerConnection Hook</h2>
     <section>
-        <h3>Neue Features</h3>
+        <h3>Updates</h3>
         <ul>
             <li>
-                <strong>Erweiterter Status:</strong>
-                <pre>{
-  isConnected: boolean,
-  error: string | null,
-  reconnectAttempt: number
-}</pre>
+                <strong>Erweiterte Konfiguration:</strong>
+                <ul>
+                    <li>Mehrere STUN-Server</li>
+                    <li>ICE Transport Policy</li>
+                    <li>ICE Candidate Pool</li>
+                </ul>
             </li>
             <li>
-                <strong>Erweiterte Optionen:</strong>
-                <pre>{
-  maxReconnectAttempts: number,
-  reconnectTimeout: number,
-  priorityQueueSize: number
-}</pre>
-            </li>
-            <li>
-                <strong>Priorisierte Nachrichten:</strong>
-                <p>sendMessage(type: string, payload: any, priority?: boolean)</p>
+                <strong>Verbesserte Verbindungsstabilität:</strong>
+                <ul>
+                    <li>Automatische ICE-Kandidaten-Verwaltung</li>
+                    <li>Verbindungsstatus-Monitoring</li>
+                    <li>Fehlertolerante Implementierung</li>
+                </ul>
             </li>
         </ul>
     </section>
