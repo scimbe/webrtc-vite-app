@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 
-export const RoomEntryPage = () => {
+function RoomEntryPage() {
   const navigate = useNavigate();
   const [formData, setFormData] = useState({
     roomId: '',
@@ -20,13 +20,7 @@ export const RoomEntryPage = () => {
     
     if (!roomId.trim() || !userName.trim()) return;
 
-    const path = `/room/${roomId}`;
-    const params = new URLSearchParams({
-      userName: userName.trim(),
-      isHost: isNewRoom ? '1' : '0'
-    });
-
-    navigate(`${path}?${params}`);
+    navigate(`/room/${roomId}?userName=${encodeURIComponent(userName.trim())}&isHost=${isNewRoom ? '1' : '0'}`);
   };
 
   return (
@@ -39,6 +33,7 @@ export const RoomEntryPage = () => {
         <div className="mb-6">
           <div className="flex space-x-4">
             <button
+              type="button"
               onClick={() => setFormData(prev => ({ ...prev, isNewRoom: true }))}
               className={`flex-1 py-2 px-4 rounded-lg ${formData.isNewRoom 
                 ? 'bg-blue-500 text-white' 
@@ -47,6 +42,7 @@ export const RoomEntryPage = () => {
               Neuer Raum
             </button>
             <button
+              type="button"
               onClick={() => setFormData(prev => ({ ...prev, isNewRoom: false }))}
               className={`flex-1 py-2 px-4 rounded-lg ${!formData.isNewRoom 
                 ? 'bg-blue-500 text-white' 
@@ -108,4 +104,6 @@ export const RoomEntryPage = () => {
       </div>
     </div>
   );
-};
+}
+
+export default RoomEntryPage;
