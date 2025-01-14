@@ -2,7 +2,9 @@
   "name": "webrtc-vite-app",
   "version": "1.0.0",
   "scripts": {
-    "dev": "concurrently \"vite\" \"node server.js\"",
+    "dev:client": "vite",
+    "dev:server": "node server.js",
+    "dev": "concurrently \"npm run dev:client\" \"npm run dev:server\"",
     "build": "vite build",
     "preview": "vite preview"
   },
