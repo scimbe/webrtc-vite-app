@@ -4,8 +4,8 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { LoadingSpinner } from './components/LoadingSpinner';
 
-const RoomEntryPage = React.lazy(() => import('./pages/Room/RoomEntryPage'));
-const RoomPage = React.lazy(() => import('./pages/Room/RoomPage'));
+const RoomEntryPage = React.lazy(() => import('./pages/Room/RoomEntryPage.jsx'));
+const RoomPage = React.lazy(() => import('./pages/Room/RoomPage.jsx'));
 
 function App() {
   return (
