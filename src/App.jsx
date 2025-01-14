@@ -4,8 +4,9 @@ import { ErrorBoundary } from './components/ErrorBoundary';
 import { Layout } from './components/Layout';
 import { LoadingSpinner } from './components/LoadingSpinner';
 
-const RoomEntryPage = React.lazy(() => import('./pages/Room/RoomEntryPage.jsx'));
-const RoomPage = React.lazy(() => import('./pages/Room/RoomPage.jsx'));
+// Direkte Imports statt lazy loading für Debugging
+import RoomEntryPage from './pages/Room/RoomEntryPage';
+import RoomPage from './pages/Room/RoomPage';
 
 function App() {
   return (
