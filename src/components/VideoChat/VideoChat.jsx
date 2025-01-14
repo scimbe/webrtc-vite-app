@@ -1,11 +1,6 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { VideoStream } from '../VideoStream';
-import { ControlPanel } from '../ControlPanel';
-import { RoomInfo } from '../Room/RoomInfo';
-import { RoomControls } from '../Room/RoomControls';
-import { RoomChat } from '../Room/RoomChat';
-import { RoomInvite } from '../Room/RoomInvite';
-import { useRoomWebSocket } from '../../hooks/useRoomWebSocket';
+import React, { useEffect, useState } from 'react';
+import { VideoStream } from './VideoStream';
+import { ControlPanel } from './ControlPanel';
 
 export const VideoChat = ({
   peerConnection,
@@ -16,87 +11,68 @@ export const VideoChat = ({
   participants,
   onKickParticipant,
   onUpdateSettings,
-  ...roomState
+  isConnected
 }) => {
-  const [isChatOpen, setIsChatOpen] = useState(false);
-  const [isInviteOpen, setIsInviteOpen] = useState(false);
-  const [localMediaSettings, setLocalMediaSettings] = useState({
-    audio: true,
-    video: true
-  });
-
-  const { sendMessage, messages } = useRoomWebSocket(roomConfig.roomId, roomConfig.userName);
-
-  const toggleChat = () => {
-    setIsChatOpen(!isChatOpen);
-  };
-
-  const toggleInvite = () => {
-    setIsInviteOpen(!isInviteOpen);
-  };
-
-  const handleMediaSettingsChange = useCallback((type, enabled) => {
-    setLocalMediaSettings(prev => ({
-      ...prev,
-      [type]: enabled
-    }));
-
-    // Additional logic to actually change media tracks
+  const [isMuted, setIsMuted] = useState(false);
+  const [isVideoOff, setIsVideoOff] = useState(false);
+  
+  useEffect(() => {
     if (localStream) {
-      const tracks = type === 'audio' 
-        ? localStream.getAudioTracks() 
-        : localStream.getVideoTracks();
-      
-      tracks.forEach(track => {
-        track.enabled = enabled;
+      localStream.getAudioTracks().forEach(track => {
+        track.enabled = !isMuted;
       });
     }
-  }, [localStream]);
+  }, [isMuted, localStream]);
+
+  useEffect(() => {
+    if (localStream) {
+      localStream.getVideoTracks().forEach(track => {
+        track.enabled = !isVideoOff;
+      });
+    }
+  }, [isVideoOff, localStream]);
 
   return (
-    <div className="min-h-screen bg-slate-900 text-white flex flex-col">
-      <div className="flex flex-1 overflow-hidden">
-        {/* Main Video Area */}
-        <div className={`flex-1 flex items-center justify-center relative ${isChatOpen ? 'w-2/3' : 'w-full'}`}>
-          <VideoStream 
-            localStream={localStream} 
-            remoteStream={remoteStream} 
-            connectionState={connectionState}
-          />
-          
-          <ControlPanel 
-            onToggleChat={toggleChat} 
-            onToggleInvite={toggleInvite}
-            localMediaSettings={localMediaSettings}
-            onMediaSettingsChange={handleMediaSettingsChange}
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 p-4">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4">
+        {/* Lokaler Stream */}
+        <div className="relative">
+          <VideoStream
+            stream={localStream}
+            isMuted={true}
+            label={`${roomConfig.userName} (Du)`}
+            isLocal={true}
           />
         </div>
 
-        {/* Chat Sidebar */}
-        {isChatOpen && (
-          <RoomChat 
-            messages={messages} 
-            sendMessage={sendMessage} 
-            onClose={toggleChat} 
-          />
-        )}
+        {/* Remote Stream */}
+        <div className="relative">
+          {remoteStream ? (
+            <VideoStream
+              stream={remoteStream}
+              isMuted={false}
+              label={participants.find(p => p.id !== roomConfig.userId)?.name || 'Remote User'}
+              isLocal={false}
+            />
+          ) : (
+            <div className="aspect-video bg-slate-800 rounded-lg flex items-center justify-center">
+              <p className="text-slate-400">Warte auf Teilnehmer...</p>
+            </div>
+          )}
+        </div>
       </div>
 
-      {/* Room Controls */}
-      <RoomControls 
-        roomConfig={roomConfig}
-        participants={participants}
+      <ControlPanel
+        isMuted={isMuted}
+        isVideoOff={isVideoOff}
+        onToggleMute={() => setIsMuted(!isMuted)}
+        onToggleVideo={() => setIsVideoOff(!isVideoOff)}
+        onLeave={() => window.location.href = '/'}
+        isHost={roomConfig.isHost}
         onKickParticipant={onKickParticipant}
-        onUpdateSettings={onUpdateSettings}
+        participants={participants}
+        connectionState={connectionState}
       />
-
-      {/* Room Invite Modal */}
-      {isInviteOpen && (
-        <RoomInvite 
-          roomId={roomConfig.roomId} 
-          onClose={toggleInvite} 
-        />
-      )}
     </div>
   );
 };
