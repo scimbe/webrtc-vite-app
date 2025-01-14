@@ -5,34 +5,48 @@ export function useWebSocket(roomId) {
   const [error, setError] = useState(null);
   const wsRef = useRef(null);
   const messageHandlersRef = useRef({});
-  
+  const reconnectAttemptsRef = useRef(0);
+  const maxReconnectAttempts = 5;
+
+  const getWebSocketUrl = useCallback(() => {
+    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+    const host = window.location.hostname;
+    const port = import.meta.env.DEV ? '3001' : window.location.port;
+    return `${protocol}//${host}:${port}/ws`;
+  }, []);
+
   const connect = useCallback(() => {
     try {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.close();
       }
 
-      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      const wsUrl = `${protocol}//${window.location.host}/ws/${roomId}`;
-      console.log('Connecting to WebSocket:', wsUrl);
+      console.log('Connecting to WebSocket:', getWebSocketUrl());
+      const ws = new WebSocket(getWebSocketUrl());
 
-      const ws = new WebSocket(wsUrl);
-      
       ws.onopen = () => {
         console.log('WebSocket connected');
         setIsConnected(true);
         setError(null);
+        reconnectAttemptsRef.current = 0;
       };
 
-      ws.onclose = () => {
-        console.log('WebSocket closed');
+      ws.onclose = (event) => {
+        console.log('WebSocket closed:', event.code);
         setIsConnected(false);
+        wsRef.current = null;
+
+        if (!event.wasClean && reconnectAttemptsRef.current < maxReconnectAttempts) {
+          const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
+          console.log(`Reconnecting in ${delay}ms...`);
+          reconnectAttemptsRef.current++;
+          setTimeout(connect, delay);
+        }
       };
 
       ws.onerror = (event) => {
         console.error('WebSocket error:', event);
         setError(new Error('WebSocket connection error'));
-        setIsConnected(false);
       };
 
       ws.onmessage = (event) => {
@@ -42,29 +56,45 @@ export function useWebSocket(roomId) {
           handlers.forEach(handler => {
             try {
               handler(message.data);
-            } catch (error) {
-              console.error('Handler error:', error);
+            } catch (err) {
+              console.error('Handler error:', err);
             }
           });
-        } catch (error) {
-          console.error('Message parsing error:', error);
+        } catch (err) {
+          console.error('Message parsing error:', err);
         }
       };
 
+      // Keep-alive ping
+      const pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 30000);
+
       wsRef.current = ws;
 
-    } catch (error) {
-      console.error('Connection error:', error);
-      setError(error);
+      return () => {
+        clearInterval(pingInterval);
+        if (wsRef.current) {
+          wsRef.current.close();
+        }
+      };
+    } catch (err) {
+      console.error('Connection error:', err);
+      setError(err);
       setIsConnected(false);
+      return () => {};
     }
-  }, [roomId]);
+  }, [getWebSocketUrl]);
 
   useEffect(() => {
-    connect();
+    const cleanup = connect();
     return () => {
+      cleanup();
       if (wsRef.current) {
         wsRef.current.close();
+        wsRef.current = null;
       }
     };
   }, [connect]);
@@ -78,8 +108,8 @@ export function useWebSocket(roomId) {
     try {
       wsRef.current.send(JSON.stringify(message));
       return true;
-    } catch (error) {
-      console.error('Send error:', error);
+    } catch (err) {
+      console.error('Send error:', err);
       return false;
     }
   }, []);
