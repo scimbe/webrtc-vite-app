@@ -24,7 +24,7 @@ export const VideoStream = ({
           autoPlay
           playsInline
           muted={isMuted}
-          className={`w-full h-full object-cover ${isLocal ? 'mirror' : ''}`}
+          className={`w-full h-full object-cover ${isLocal ? 'scale-x-[-1]' : ''}`}
         />
       ) : (
         <div className="w-full h-full flex items-center justify-center">
@@ -37,12 +37,6 @@ export const VideoStream = ({
           {label}
         </p>
       </div>
-
-      <style jsx>{`
-        .mirror {
-          transform: scaleX(-1);
-        }
-      `}</style>
     </div>
   );
 };
