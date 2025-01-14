@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Camera } from '@lucide/react';
+import { Camera } from 'lucide-react';
 
 export const VideoStream = ({
   stream,
