@@ -1,20 +1,48 @@
 import { WebSocketServer } from 'ws';
 import { createServer } from 'http';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-const server = createServer();
-const wss = new WebSocketServer({ server, path: '/' });
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
+const server = createServer((req, res) => {
+  res.writeHead(404);
+  res.end();
+});
+
+const wss = new WebSocketServer({ 
+  server,
+  path: '/ws',
+  perMessageDeflate: false,
+  clientTracking: true,
+  backlog: 100,
+  maxPayload: 50 * 1024 * 1024, // 50MB
+});
 
 const rooms = new Map();
 
 wss.on('connection', (ws, req) => {
-  console.log('New client connected');
+  const clientIp = req.socket.remoteAddress;
+  console.log(`New client connected from ${clientIp}`);
+
   let roomId = '';
   let userId = '';
+
+  const ping = setInterval(() => {
+    if (ws.readyState === ws.OPEN) {
+      ws.ping();
+    }
+  }, 30000);
+
+  ws.on('pong', () => {
+    // Client is alive
+  });
 
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message.toString());
-      console.log('Received:', data);
+      console.log('Received:', { type: data.type, roomId: data.roomId });
 
       if (data.type === 'join') {
         roomId = data.data.roomId;
@@ -26,9 +54,9 @@ wss.on('connection', (ws, req) => {
         rooms.get(roomId).set(userId, ws);
 
         // Send room status to all clients in the room
-        const roomClients = Array.from(rooms.get(roomId).entries()).map(([id, client]) => ({
+        const roomClients = Array.from(rooms.get(roomId).entries()).map(([id, _]) => ({
           userId: id,
-          isConnected: client.readyState === ws.OPEN
+          isConnected: true
         }));
 
         const statusMessage = {
@@ -40,7 +68,6 @@ wss.on('connection', (ws, req) => {
 
         broadcastToRoom(roomId, statusMessage);
       } else if (roomId && rooms.has(roomId)) {
-        // Broadcast message to other clients in the room
         broadcastToRoom(roomId, data, userId);
       }
     } catch (error) {
@@ -49,13 +76,14 @@ wss.on('connection', (ws, req) => {
   });
 
   ws.on('close', () => {
-    console.log('Client disconnected');
+    clearInterval(ping);
+    console.log(`Client disconnected from room ${roomId}`);
+    
     if (roomId && rooms.has(roomId)) {
       rooms.get(roomId).delete(userId);
       if (rooms.get(roomId).size === 0) {
         rooms.delete(roomId);
       } else {
-        // Notify others about disconnection
         broadcastToRoom(roomId, {
           type: 'participant_left',
           data: { userId }
@@ -71,16 +99,40 @@ wss.on('connection', (ws, req) => {
 
 function broadcastToRoom(roomId, message, excludeUserId = null) {
   if (rooms.has(roomId)) {
-    const wsOpen = WebSocketServer.OPEN;
-    rooms.get(roomId).forEach((client, userId) => {
-      if (userId !== excludeUserId && client.readyState === wsOpen) {
-        client.send(JSON.stringify(message));
+    const room = rooms.get(roomId);
+    room.forEach((client, userId) => {
+      if (userId !== excludeUserId && client.readyState === WebSocketServer.OPEN) {
+        try {
+          client.send(JSON.stringify(message));
+        } catch (error) {
+          console.error(`Error sending to client ${userId}:`, error);
+          // Remove problematic client
+          room.delete(userId);
+        }
       }
     });
   }
 }
 
 const PORT = process.env.PORT || 3001;
+
+server.on('error', (error) => {
+  console.error('Server error:', error);
+});
+
 server.listen(PORT, () => {
   console.log(`WebSocket server running on port ${PORT}`);
+});
+
+process.on('SIGTERM', () => {
+  console.log('SIGTERM received. Closing server...');
+  wss.close(() => {
+    server.close(() => {
+      process.exit(0);
+    });
+  });
+});
+
+process.on('uncaughtException', (error) => {
+  console.error('Uncaught Exception:', error);
 });
