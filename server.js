@@ -1,8 +1,8 @@
-const WebSocket = require('ws');
-const http = require('http');
+import { WebSocketServer } from 'ws';
+import { createServer } from 'http';
 
-const server = http.createServer();
-const wss = new WebSocket.Server({ server, path: '/' });
+const server = createServer();
+const wss = new WebSocketServer({ server, path: '/' });
 
 const rooms = new Map();
 
@@ -28,7 +28,7 @@ wss.on('connection', (ws, req) => {
         // Send room status to all clients in the room
         const roomClients = Array.from(rooms.get(roomId).entries()).map(([id, client]) => ({
           userId: id,
-          isConnected: client.readyState === WebSocket.OPEN
+          isConnected: client.readyState === ws.OPEN
         }));
 
         const statusMessage = {
@@ -71,8 +71,9 @@ wss.on('connection', (ws, req) => {
 
 function broadcastToRoom(roomId, message, excludeUserId = null) {
   if (rooms.has(roomId)) {
+    const wsOpen = WebSocketServer.OPEN;
     rooms.get(roomId).forEach((client, userId) => {
-      if (userId !== excludeUserId && client.readyState === WebSocket.OPEN) {
+      if (userId !== excludeUserId && client.readyState === wsOpen) {
         client.send(JSON.stringify(message));
       }
     });
