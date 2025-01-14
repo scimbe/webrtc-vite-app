@@ -10,9 +10,17 @@ export default defineConfig({
       '/ws': {
         target: 'ws://localhost:3001',
         ws: true,
-        changeOrigin: true,
         secure: false,
-        rewrite: (path) => path.replace(/^\/ws/, '')
+        changeOrigin: true,
+        onError: (err, req, res) => {
+          console.error('Proxy error:', err);
+        },
+        onProxyReqWs: (proxyReq, req, socket, options, head) => {
+          console.log('Proxying WebSocket request:', req.url);
+        },
+        onProxyRes: (proxyRes, req, res) => {
+          console.log('Proxy response:', proxyRes.statusCode);
+        }
       }
     }
   }
