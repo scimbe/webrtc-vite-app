@@ -2,8 +2,8 @@ import React from 'react';
 import { Camera, CameraOff, Mic, MicOff, X } from 'lucide-react';
 
 export const ControlPanel = ({
-  isMuted,
-  isVideoOff,
+  isMuted = false,
+  isVideoOff = false,
   onToggleMute,
   onToggleVideo,
   onLeave,
