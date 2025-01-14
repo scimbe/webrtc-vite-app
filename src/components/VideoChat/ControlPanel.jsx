@@ -1,5 +1,5 @@
 import React from 'react';
-import { Camera, CameraOff, Mic, MicOff, X } from 'lucide-react';
+import { Camera, CameraOff, Mic, MicOff, X } from '@lucide/react';
 
 export const ControlPanel = ({
   isMuted = false,
@@ -50,7 +50,6 @@ export const ControlPanel = ({
         </button>
       </div>
 
-      {/* Connection Status */}
       {connectionState !== 'connected' && (
         <div className="text-center text-white mt-2">
           {connectionState === 'connecting' ? 'Verbindung wird hergestellt...' : 'Verbindung unterbrochen'}

@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Camera } from 'lucide-react';
+import { Camera } from '@lucide/react';
 
 export const VideoStream = ({
   stream,
@@ -38,7 +38,6 @@ export const VideoStream = ({
         </p>
       </div>
 
-      {/* Custom Styles */}
       <style jsx>{`
         .mirror {
           transform: scaleX(-1);
