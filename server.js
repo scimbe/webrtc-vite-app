@@ -1,66 +1,85 @@
 const WebSocket = require('ws');
 const http = require('http');
 
-// Create HTTP server
-const server = http.createServer((req, res) => {
-  res.writeHead(404);
-  res.end();
-});
+const server = http.createServer();
+const wss = new WebSocket.Server({ server, path: '/' });
 
-// Create WebSocket server
-const wss = new WebSocket.Server({ server, path: '/ws' });
-
-// Store connected clients
 const rooms = new Map();
 
 wss.on('connection', (ws, req) => {
-  const roomId = req.url.split('/').pop(); // Extract room ID from URL
-  console.log(`Client connected to room: ${roomId}`);
+  console.log('New client connected');
+  let roomId = '';
+  let userId = '';
 
-  // Add client to room
-  if (!rooms.has(roomId)) {
-    rooms.set(roomId, new Set());
-  }
-  rooms.get(roomId).add(ws);
-
-  // Handle messages
   ws.on('message', (message) => {
     try {
-      const data = JSON.parse(message);
-      console.log(`Received message in room ${roomId}:`, data);
+      const data = JSON.parse(message.toString());
+      console.log('Received:', data);
 
-      // Broadcast to all clients in the same room
-      rooms.get(roomId).forEach((client) => {
-        if (client !== ws && client.readyState === WebSocket.OPEN) {
-          client.send(JSON.stringify(data));
+      if (data.type === 'join') {
+        roomId = data.data.roomId;
+        userId = data.data.userId;
+
+        if (!rooms.has(roomId)) {
+          rooms.set(roomId, new Map());
         }
-      });
-    } catch (err) {
-      console.error('Error processing message:', err);
+        rooms.get(roomId).set(userId, ws);
+
+        // Send room status to all clients in the room
+        const roomClients = Array.from(rooms.get(roomId).entries()).map(([id, client]) => ({
+          userId: id,
+          isConnected: client.readyState === WebSocket.OPEN
+        }));
+
+        const statusMessage = {
+          type: 'room_status',
+          data: {
+            participants: roomClients
+          }
+        };
+
+        broadcastToRoom(roomId, statusMessage);
+      } else if (roomId && rooms.has(roomId)) {
+        // Broadcast message to other clients in the room
+        broadcastToRoom(roomId, data, userId);
+      }
+    } catch (error) {
+      console.error('Error handling message:', error);
     }
   });
 
-  // Handle client disconnect
   ws.on('close', () => {
-    console.log(`Client disconnected from room: ${roomId}`);
-    rooms.get(roomId)?.delete(ws);
-    if (rooms.get(roomId)?.size === 0) {
-      rooms.delete(roomId);
+    console.log('Client disconnected');
+    if (roomId && rooms.has(roomId)) {
+      rooms.get(roomId).delete(userId);
+      if (rooms.get(roomId).size === 0) {
+        rooms.delete(roomId);
+      } else {
+        // Notify others about disconnection
+        broadcastToRoom(roomId, {
+          type: 'participant_left',
+          data: { userId }
+        });
+      }
     }
   });
 
-  // Send initial room status
-  ws.send(JSON.stringify({
-    type: 'room_status',
-    data: {
-      roomId,
-      participants: [...(rooms.get(roomId) || [])].length
-    }
-  }));
+  ws.on('error', (error) => {
+    console.error('WebSocket error:', error);
+  });
 });
 
-const PORT = process.env.PORT || 3001;
+function broadcastToRoom(roomId, message, excludeUserId = null) {
+  if (rooms.has(roomId)) {
+    rooms.get(roomId).forEach((client, userId) => {
+      if (userId !== excludeUserId && client.readyState === WebSocket.OPEN) {
+        client.send(JSON.stringify(message));
+      }
+    });
+  }
+}
 
+const PORT = process.env.PORT || 3001;
 server.listen(PORT, () => {
-  console.log(`WebSocket server is running on port ${PORT}`);
+  console.log(`WebSocket server running on port ${PORT}`);
 });
