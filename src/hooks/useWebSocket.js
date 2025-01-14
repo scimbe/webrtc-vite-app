@@ -5,143 +5,99 @@ export function useWebSocket(roomId) {
   const [error, setError] = useState(null);
   const wsRef = useRef(null);
   const messageHandlersRef = useRef({});
-  const reconnectAttemptRef = useRef(0);
-  const maxReconnectAttempts = 5;
-
-  // Konfiguriere WebSocket URL basierend auf der Umgebung
-  const getWebSocketUrl = useCallback(() => {
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = import.meta.env.VITE_WS_HOST || window.location.hostname;
-    const port = import.meta.env.VITE_WS_PORT || '3000';
-    return `${protocol}//${host}:${port}/ws/${roomId}`;
-  }, [roomId]);
-
+  
   const connect = useCallback(() => {
     try {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.close();
       }
 
-      console.log('Versuche WebSocket-Verbindung aufzubauen:', getWebSocketUrl());
-      const websocket = new WebSocket(getWebSocketUrl());
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      const wsUrl = `${protocol}//${window.location.host}/ws/${roomId}`;
+      console.log('Connecting to WebSocket:', wsUrl);
+
+      const ws = new WebSocket(wsUrl);
       
-      websocket.onopen = () => {
-        console.log('WebSocket verbunden');
+      ws.onopen = () => {
+        console.log('WebSocket connected');
         setIsConnected(true);
         setError(null);
-        reconnectAttemptRef.current = 0;
       };
 
-      websocket.onclose = (event) => {
-        console.log('WebSocket geschlossen:', event.code);
+      ws.onclose = () => {
+        console.log('WebSocket closed');
         setIsConnected(false);
-        wsRef.current = null;
-
-        if (!event.wasClean && reconnectAttemptRef.current < maxReconnectAttempts) {
-          const timeout = Math.min(
-            1000 * Math.pow(2, reconnectAttemptRef.current),
-            30000
-          );
-          reconnectAttemptRef.current++;
-          console.log(`Wiederverbindungsversuch ${reconnectAttemptRef.current} in ${timeout}ms`);
-          setTimeout(connect, timeout);
-        }
       };
 
-      websocket.onerror = (event) => {
-        console.error('WebSocket Fehler:', event);
-        setError(new Error('WebSocket Verbindungsfehler'));
+      ws.onerror = (event) => {
+        console.error('WebSocket error:', event);
+        setError(new Error('WebSocket connection error'));
         setIsConnected(false);
-
-        // Versuche alternative Verbindung über Socket.IO
-        if (!import.meta.env.PROD) {
-          console.log('Versuche alternative Verbindung...');
-          const alternativeUrl = `${protocol}//${host}:${Number(port) + 1}/ws/${roomId}`;
-          const altWebsocket = new WebSocket(alternativeUrl);
-          wsRef.current = altWebsocket;
-          // Setup der Event Handler für die alternative Verbindung
-          setupEventHandlers(altWebsocket);
-        }
       };
 
-      websocket.onmessage = (event) => {
+      ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          const { type, data } = message;
-
-          const handlers = messageHandlersRef.current[type];
-          if (handlers) {
-            handlers.forEach(handler => {
-              try {
-                handler(data);
-              } catch (err) {
-                console.error('Handler Fehler:', err);
-              }
-            });
-          }
-        } catch (err) {
-          console.error('Nachrichtenverarbeitung fehlgeschlagen:', err);
+          const handlers = messageHandlersRef.current[message.type] || [];
+          handlers.forEach(handler => {
+            try {
+              handler(message.data);
+            } catch (error) {
+              console.error('Handler error:', error);
+            }
+          });
+        } catch (error) {
+          console.error('Message parsing error:', error);
         }
       };
 
-      wsRef.current = websocket;
+      wsRef.current = ws;
 
-    } catch (err) {
-      console.error('WebSocket Verbindungsaufbau fehlgeschlagen:', err);
-      setError(err);
+    } catch (error) {
+      console.error('Connection error:', error);
+      setError(error);
       setIsConnected(false);
     }
-  }, [getWebSocketUrl]);
+  }, [roomId]);
 
   useEffect(() => {
     connect();
     return () => {
       if (wsRef.current) {
-        wsRef.current.close(1000, 'Cleanup');
-        wsRef.current = null;
+        wsRef.current.close();
       }
     };
   }, [connect]);
 
   const sendMessage = useCallback((message) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn('WebSocket nicht verbunden. Nachricht nicht gesendet:', message);
+      console.warn('WebSocket not connected');
       return false;
     }
 
     try {
-      const stringifiedMessage = JSON.stringify(message);
-      wsRef.current.send(stringifiedMessage);
+      wsRef.current.send(JSON.stringify(message));
       return true;
-    } catch (err) {
-      console.error('Nachricht konnte nicht gesendet werden:', err);
+    } catch (error) {
+      console.error('Send error:', error);
       return false;
     }
   }, []);
 
   const addMessageHandler = useCallback((type, handler) => {
-    if (typeof type !== 'string' || typeof handler !== 'function') {
-      console.warn('Ungültiger Message Handler:', { type, handler });
-      return () => {};
-    }
-
     if (!messageHandlersRef.current[type]) {
-      messageHandlersRef.current[type] = new Set();
+      messageHandlersRef.current[type] = [];
     }
-
-    messageHandlersRef.current[type].add(handler);
-    console.log(`Handler für '${type}' registriert`);
+    messageHandlersRef.current[type].push(handler);
 
     return () => {
-      if (messageHandlersRef.current[type]) {
-        messageHandlersRef.current[type].delete(handler);
-        console.log(`Handler für '${type}' entfernt`);
-      }
+      messageHandlersRef.current[type] = 
+        messageHandlersRef.current[type].filter(h => h !== handler);
     };
   }, []);
 
   return {
-    isConnected: Boolean(isConnected),
+    isConnected,
     error,
     sendMessage,
     addMessageHandler
