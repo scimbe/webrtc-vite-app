@@ -11,9 +11,9 @@ export function useWebSocket(roomId) {
   const getWebSocketUrl = useCallback(() => {
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
     const host = window.location.hostname;
-    const port = import.meta.env.DEV ? '3001' : window.location.port;
-    return `${protocol}//${host}:${port}/ws`;
-  }, []);
+    const port = '3001';
+    return `${protocol}//${host}:${port}/room/${roomId}`;
+  }, [roomId]);
 
   const connect = useCallback(() => {
     try {
@@ -21,11 +21,11 @@ export function useWebSocket(roomId) {
         wsRef.current.close();
       }
 
-      console.log('Connecting to WebSocket:', getWebSocketUrl());
       const ws = new WebSocket(getWebSocketUrl());
+      console.log('Attempting to connect to:', getWebSocketUrl());
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected successfully');
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
@@ -38,7 +38,6 @@ export function useWebSocket(roomId) {
 
         if (!event.wasClean && reconnectAttemptsRef.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
-          console.log(`Reconnecting in ${delay}ms...`);
           reconnectAttemptsRef.current++;
           setTimeout(connect, delay);
         }
@@ -52,6 +51,7 @@ export function useWebSocket(roomId) {
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
+          console.log('Received message:', message.type);
           const handlers = messageHandlersRef.current[message.type] || [];
           handlers.forEach(handler => {
             try {
@@ -65,19 +65,11 @@ export function useWebSocket(roomId) {
         }
       };
 
-      // Keep-alive ping
-      const pingInterval = setInterval(() => {
-        if (ws.readyState === WebSocket.OPEN) {
-          ws.send(JSON.stringify({ type: 'ping' }));
-        }
-      }, 30000);
-
       wsRef.current = ws;
 
       return () => {
-        clearInterval(pingInterval);
-        if (wsRef.current) {
-          wsRef.current.close();
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.close();
         }
       };
     } catch (err) {
@@ -101,7 +93,7 @@ export function useWebSocket(roomId) {
 
   const sendMessage = useCallback((message) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
-      console.warn('WebSocket not connected');
+      console.warn('WebSocket not connected, message not sent:', message);
       return false;
     }
 
