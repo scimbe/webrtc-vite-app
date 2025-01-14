@@ -10,13 +10,10 @@ export default defineConfig({
       '/ws': {
         target: 'ws://localhost:3001',
         ws: true,
+        changeOrigin: true,
+        secure: false,
+        rewrite: (path) => path.replace(/^\/ws/, '')
       }
-    }
-  },
-  define: {
-    'process.env': {
-      VITE_WS_PORT: 3001,
-      VITE_WS_HOST: 'localhost'
     }
   }
 });
