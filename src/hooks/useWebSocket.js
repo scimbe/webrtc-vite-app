@@ -1,160 +1,122 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 
 export function useWebSocket(url) {
-  const [ws, setWs] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [error, setError] = useState(null);
+  const wsRef = useRef(null);
   const messageHandlersRef = useRef({});
   const reconnectAttemptRef = useRef(0);
-  const abortControllerRef = useRef(new AbortController());
+  const maxReconnectAttempts = 5;
 
   const connect = useCallback(() => {
-    // Vorherige Verbindung abbrechen
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
-
-    // Exponential Backoff mit zufälliger Variation
-    const baseTimeout = 1000;
-    const timeout = Math.min(
-      baseTimeout * Math.pow(2, reconnectAttemptRef.current) + 
-      Math.random() * 500, 
-      30000
-    );
-    reconnectAttemptRef.current++;
-
     try {
-      const websocket = new WebSocket(url, [], {
-        // Zusätzliche WebSocket-Optionen
-        protocol: 'webrtc-room-protocol',
-        signal: abortControllerRef.current.signal
-      });
+      if (wsRef.current?.readyState === WebSocket.OPEN) {
+        wsRef.current.close();
+      }
+
+      const websocket = new WebSocket(url);
       
       websocket.onopen = () => {
         setIsConnected(true);
         setError(null);
         reconnectAttemptRef.current = 0;
-        console.log('WebSocket verbunden:', {
-          url,
-          timestamp: new Date().toISOString()
-        });
+        console.log('WebSocket verbunden');
       };
 
       websocket.onclose = (event) => {
         setIsConnected(false);
-        console.warn('WebSocket geschlossen:', {
-          code: event.code,
-          reason: event.reason,
-          wasClean: event.wasClean,
-          url,
-          reconnectAttempt: reconnectAttemptRef.current,
-          timestamp: new Date().toISOString()
-        });
+        wsRef.current = null;
 
-        // Automatische Wiederverbindung nur bei unerwarteten Schließungen
-        if (!event.wasClean) {
+        if (!event.wasClean && reconnectAttemptRef.current < maxReconnectAttempts) {
+          const timeout = Math.min(
+            1000 * Math.pow(2, reconnectAttemptRef.current),
+            30000
+          );
+          reconnectAttemptRef.current++;
           setTimeout(connect, timeout);
         }
       };
 
-      websocket.onerror = (error) => {
-        console.error('WebSocket Fehler:', {
-          url,
-          error: {
-            type: error.type,
-            target: error.target.toString(),
-            eventPhase: error.eventPhase
-          },
-          reconnectAttempt: reconnectAttemptRef.current,
-          timestamp: new Date().toISOString()
-        });
-        setError(error);
-        websocket.close();
+      websocket.onerror = (event) => {
+        setError(new Error('WebSocket Verbindungsfehler'));
+        setIsConnected(false);
       };
 
       websocket.onmessage = (event) => {
         try {
-          const data = JSON.parse(event.data);
-          const handlers = messageHandlersRef.current[data.type] || [];
-          handlers.forEach(handler => {
-            try {
-              handler(data.data);
-            } catch (handlerError) {
-              console.error('Fehler bei Nachrichtenverarbeitung:', handlerError);
-            }
-          });
+          const message = JSON.parse(event.data);
+          const { type, data } = message;
+
+          const handlers = messageHandlersRef.current[type];
+          if (handlers) {
+            handlers.forEach(handler => {
+              try {
+                handler(data);
+              } catch (err) {
+                console.error('Handler Fehler:', err);
+              }
+            });
+          }
         } catch (err) {
-          console.error('Nachrichtenverarbeitung fehlgeschlagen:', {
-            error: err,
-            rawData: event.data
-          });
+          console.error('Nachrichtenverarbeitung fehlgeschlagen:', err);
         }
       };
 
-      setWs(websocket);
+      wsRef.current = websocket;
+
     } catch (err) {
-      console.error('WebSocket Verbindungsaufbau fehlgeschlagen:', {
-        url,
-        error: err,
-        reconnectAttempt: reconnectAttemptRef.current,
-        timestamp: new Date().toISOString()
-      });
       setError(err);
+      setIsConnected(false);
     }
   }, [url]);
 
   useEffect(() => {
     connect();
-
     return () => {
-      // Verbindung sicher schließen
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-      if (ws) {
-        ws.close(1000, 'Komponente unmounted');
+      if (wsRef.current) {
+        wsRef.current.close(1000, 'Cleanup');
+        wsRef.current = null;
       }
     };
   }, [connect]);
 
   const sendMessage = useCallback((message) => {
-    if (ws?.readyState === WebSocket.OPEN) {
-      try {
-        ws.send(JSON.stringify(message));
-        return true;
-      } catch (error) {
-        console.warn('Nachrichtenversand fehlgeschlagen', {
-          error,
-          message
-        });
-        return false;
-      }
+    if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
+      return false;
     }
-    console.warn('Nachricht konnte nicht gesendet werden: WebSocket nicht offen', {
-      readyState: ws?.readyState,
-      message
-    });
-    return false;
-  }, [ws]);
+
+    try {
+      const stringifiedMessage = JSON.stringify(message);
+      wsRef.current.send(stringifiedMessage);
+      return true;
+    } catch (err) {
+      console.error('Nachricht konnte nicht gesendet werden:', err);
+      return false;
+    }
+  }, []);
 
   const addMessageHandler = useCallback((type, handler) => {
-    if (!messageHandlersRef.current[type]) {
-      messageHandlersRef.current[type] = [];
+    if (typeof type !== 'string' || typeof handler !== 'function') {
+      return () => {};
     }
-    messageHandlersRef.current[type].push(handler);
+
+    if (!messageHandlersRef.current[type]) {
+      messageHandlersRef.current[type] = new Set();
+    }
+
+    messageHandlersRef.current[type].add(handler);
 
     return () => {
-      messageHandlersRef.current[type] = 
-        messageHandlersRef.current[type].filter(h => h !== handler);
+      if (messageHandlersRef.current[type]) {
+        messageHandlersRef.current[type].delete(handler);
+      }
     };
   }, []);
 
   return {
-    isConnected,
+    isConnected: Boolean(isConnected),
     error,
     sendMessage,
-    addMessageHandler,
-    ws
+    addMessageHandler
   };
 }
