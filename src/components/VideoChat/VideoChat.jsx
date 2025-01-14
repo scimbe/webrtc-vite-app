@@ -18,7 +18,8 @@ export const VideoChat = ({
   
   useEffect(() => {
     if (localStream) {
-      localStream.getAudioTracks().forEach(track => {
+      const audioTracks = localStream.getAudioTracks();
+      audioTracks.forEach(track => {
         track.enabled = !isMuted;
       });
     }
@@ -26,25 +27,29 @@ export const VideoChat = ({
 
   useEffect(() => {
     if (localStream) {
-      localStream.getVideoTracks().forEach(track => {
+      const videoTracks = localStream.getVideoTracks();
+      videoTracks.forEach(track => {
         track.enabled = !isVideoOff;
       });
     }
   }, [isVideoOff, localStream]);
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 p-4">
-      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <div className="relative">
+    <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 p-4 relative">
+      <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 mb-20">
+        {/* Lokaler Stream */}
+        <div className="relative aspect-video">
           <VideoStream
             stream={localStream}
             isMuted={true}
             label={`${roomConfig.userName} (Du)`}
             isLocal={true}
+            isCameraOff={isVideoOff}
           />
         </div>
 
-        <div className="relative">
+        {/* Remote Stream */}
+        <div className="relative aspect-video">
           {remoteStream ? (
             <VideoStream
               stream={remoteStream}
@@ -53,8 +58,12 @@ export const VideoChat = ({
               isLocal={false}
             />
           ) : (
-            <div className="aspect-video bg-slate-800 rounded-lg flex items-center justify-center">
-              <p className="text-slate-400">Warte auf Teilnehmer...</p>
+            <div className="w-full h-full bg-slate-800 rounded-lg flex items-center justify-center">
+              <p className="text-slate-400">
+                {connectionState === 'connecting'
+                  ? 'Verbindung wird hergestellt...'
+                  : 'Warte auf Teilnehmer...'}
+              </p>
             </div>
           )}
         </div>
@@ -67,7 +76,6 @@ export const VideoChat = ({
         onToggleVideo={() => setIsVideoOff(!isVideoOff)}
         onLeave={() => window.location.href = '/'}
         isHost={roomConfig.isHost}
-        onKickParticipant={onKickParticipant}
         participants={participants}
         connectionState={connectionState}
       />
