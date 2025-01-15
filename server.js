@@ -2,48 +2,72 @@ import { WebSocketServer } from 'ws';
 import express from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
+import { parse } from 'url';
 
 const app = express();
-app.use(cors({
-  origin: ['http://localhost:3000'],
-  methods: ['GET', 'POST']
-}));
 
+// CORS für alle Origins erlauben während der Entwicklung
+app.use(cors());
+
+// Express Server
 const server = createServer(app);
 
-// Health check endpoint
-app.get('/health', (req, res) => {
-  res.status(200).send('OK');
+// WebSocket Server
+const wss = new WebSocketServer({ 
+  noServer: true,  // Wichtig: Server selbst handlen
+  clientTracking: true
 });
 
-// WebSocket server
-const wss = new WebSocketServer({
-  server,
-  path: '/ws/room',
-  clientTracking: true,
-  perMessageDeflate: false
-});
-
-// Room management
+// Room Management
 const rooms = new Map();
 
+// HTTP zu WS Upgrade handling
+server.on('upgrade', (request, socket, head) => {
+  const { pathname } = parse(request.url);
+  console.log('Upgrade request for path:', pathname);
+
+  // Prüfe ob der Pfad mit /ws/room/ beginnt
+  if (pathname.startsWith('/ws/room/')) {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      console.log('WebSocket connection established');
+      wss.emit('connection', ws, request);
+    });
+  } else {
+    console.log('Invalid WebSocket path:', pathname);
+    socket.destroy();
+  }
+});
+
+// WebSocket Verbindungshandling
 wss.on('connection', (ws, request) => {
-  console.log('New WebSocket connection:', request.url);
-  let roomId = request.url.split('/ws/room/')[1];
+  const roomId = request.url.split('/ws/room/')[1];
+  console.log('Client connected to room:', roomId);
+  
   let userId = null;
 
+  // Regelmäßiger Ping
   const pingInterval = setInterval(() => {
     if (ws.readyState === ws.OPEN) {
       ws.ping();
     }
   }, 30000);
 
+  // Verbindung sofort bestätigen
+  try {
+    ws.send(JSON.stringify({ 
+      type: 'connected',
+      data: { roomId }
+    }));
+  } catch (err) {
+    console.error('Error sending connected message:', err);
+  }
+
   ws.on('pong', () => {
-    console.log('Received pong from client');
+    // Connection is alive
   });
 
   ws.on('close', () => {
-    console.log('Client disconnected from room:', roomId);
+    console.log(`Client disconnected from room: ${roomId}`);
     clearInterval(pingInterval);
 
     if (roomId && userId && rooms.has(roomId)) {
@@ -59,20 +83,14 @@ wss.on('connection', (ws, request) => {
     }
   });
 
-  ws.on('message', (message) => {
+  ws.on('message', async (message) => {
     try {
       const data = JSON.parse(message.toString());
-      console.log('Received message:', { type: data.type, roomId });
-
-      if (data.type === 'ping') {
-        ws.send(JSON.stringify({ type: 'pong' }));
-        return;
-      }
+      console.log('Received message:', data.type);
 
       if (data.type === 'join') {
         userId = data.data.userId;
-        console.log(`Client ${userId} joining room ${roomId}`);
-
+        
         if (!rooms.has(roomId)) {
           rooms.set(roomId, new Map());
         }
@@ -93,6 +111,8 @@ wss.on('connection', (ws, request) => {
           type: 'participant_joined',
           data: { userId }
         }, userId);
+      } else if (data.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
       } else if (roomId && rooms.has(roomId)) {
         broadcastToRoom(roomId, data, userId);
       }
@@ -100,7 +120,7 @@ wss.on('connection', (ws, request) => {
       console.error('Error processing message:', error);
       ws.send(JSON.stringify({
         type: 'error',
-        data: error.message
+        data: { message: error.message }
       }));
     }
   });
@@ -108,9 +128,6 @@ wss.on('connection', (ws, request) => {
   ws.on('error', (error) => {
     console.error('WebSocket error:', error);
   });
-
-  // Send connection confirmation
-  ws.send(JSON.stringify({ type: 'connected' }));
 });
 
 function broadcastToRoom(roomId, message, excludeUserId = null) {
@@ -135,14 +152,16 @@ function broadcastToRoom(roomId, message, excludeUserId = null) {
 const PORT = process.env.PORT || 3001;
 
 server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`WebSocket server ready on ws://localhost:${PORT}/ws/room`);
+  console.log(`Server running on port ${PORT}`);
+  console.log('WebSocket server ready');
 });
 
+// Graceful Shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received');
   wss.close(() => {
     server.close(() => {
+      console.log('Server closed');
       process.exit(0);
     });
   });
