@@ -9,13 +9,7 @@ export function useWebSocket(roomId) {
   const maxReconnectAttempts = 5;
 
   const getWebSocketUrl = useCallback(() => {
-    // In development, use the proxy
-    if (process.env.NODE_ENV === 'development') {
-      return `ws://${window.location.hostname}:3001/room/${roomId}`;
-    }
-    // In production, use relative path
-    const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    return `${protocol}//${window.location.host}/room/${roomId}`;
+    return `ws://localhost:3001/room/${roomId}`;
   }, [roomId]);
 
   const connect = useCallback(() => {
@@ -25,8 +19,7 @@ export function useWebSocket(roomId) {
       }
 
       const wsUrl = getWebSocketUrl();
-      console.log('Connecting to WebSocket:', wsUrl);
-      
+      console.log('Attempting to connect to:', wsUrl);
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
@@ -39,7 +32,6 @@ export function useWebSocket(roomId) {
       ws.onclose = (event) => {
         console.log('WebSocket closed:', event.code);
         setIsConnected(false);
-        wsRef.current = null;
 
         if (!event.wasClean && reconnectAttemptsRef.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
@@ -56,8 +48,6 @@ export function useWebSocket(roomId) {
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('Received message:', message.type);
-          
           const handlers = messageHandlersRef.current[message.type] || [];
           handlers.forEach(handler => {
             try {
