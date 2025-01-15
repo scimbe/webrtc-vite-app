@@ -9,10 +9,8 @@ export function useWebSocket(roomId) {
   const maxReconnectAttempts = 5;
 
   const getWebSocketUrl = useCallback(() => {
-    // Nutze die Vite Proxy-Konfiguration
-    const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/room/${roomId}`;
-    console.log('WebSocket URL:', wsUrl);
-    return wsUrl;
+    // Direkte Verbindung zum WebSocket-Server
+    return `ws://localhost:3001/ws/room/${roomId}`;
   }, [roomId]);
 
   const connect = useCallback(() => {
@@ -27,11 +25,12 @@ export function useWebSocket(roomId) {
         wsRef.current = null;
       }
 
-      const ws = new WebSocket(getWebSocketUrl());
-      console.log('Creating new WebSocket connection...');
+      const wsUrl = getWebSocketUrl();
+      console.log('Connecting to:', wsUrl);
+      const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
-        console.log('WebSocket connected');
+        console.log('WebSocket connected successfully');
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
@@ -52,13 +51,12 @@ export function useWebSocket(roomId) {
 
       ws.onerror = (event) => {
         console.error('WebSocket error:', event);
-        setError(new Error('WebSocket connection error'));
       };
 
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('Received message:', message.type);
+          console.log('Received message:', message);
           
           if (message.type === 'error') {
             console.error('Server error:', message.data);
