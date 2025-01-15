@@ -1,7 +1,7 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, memo } from 'react';
 import { Camera } from 'lucide-react';
 
-export const VideoStream = ({
+export const VideoStream = memo(({
   stream,
   isMuted = false,
   label,
@@ -11,9 +11,15 @@ export const VideoStream = ({
   const videoRef = useRef(null);
 
   useEffect(() => {
-    if (videoRef.current && stream) {
-      videoRef.current.srcObject = stream;
+    const videoElement = videoRef.current;
+    if (videoElement && stream) {
+      videoElement.srcObject = stream;
     }
+    return () => {
+      if (videoElement) {
+        videoElement.srcObject = null;
+      }
+    };
   }, [stream]);
 
   return (
@@ -39,4 +45,14 @@ export const VideoStream = ({
       </div>
     </div>
   );
-};
+}, (prevProps, nextProps) => {
+  // Nur neu rendern wenn sich wichtige Props ändern
+  return (
+    prevProps.stream === nextProps.stream &&
+    prevProps.isMuted === nextProps.isMuted &&
+    prevProps.isCameraOff === nextProps.isCameraOff &&
+    prevProps.label === nextProps.label
+  );
+});
+
+VideoStream.displayName = 'VideoStream';
