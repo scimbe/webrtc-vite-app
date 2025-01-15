@@ -2,35 +2,40 @@ import { WebSocketServer } from 'ws';
 import express from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
+import { fileURLToPath } from 'url';
+import { dirname } from 'path';
 
-// Express app setup
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = dirname(__filename);
+
 const app = express();
 app.use(cors());
-
-// HTTP server
-const server = createServer(app);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
-// WebSocket server
+const server = createServer(app);
+
+// WebSocket server without path restriction
 const wss = new WebSocketServer({ 
   server,
-  path: '/room',
-  clientTracking: true
+  clientTracking: true,
+  // Remove path restriction to handle all incoming connections
 });
 
-// Room management
 const rooms = new Map();
 
-wss.on('connection', (ws, request) => {
-  console.log('New connection attempt');
-  let roomId = '';
-  let userId = '';
+wss.on('listening', () => {
+  console.log('WebSocket server is listening');
+});
 
-  // Handle ping/pong
+wss.on('connection', (ws, request) => {
+  console.log('New WebSocket connection:', request.url);
+  let roomId = null;
+  let userId = null;
+
   const pingInterval = setInterval(() => {
     if (ws.readyState === ws.OPEN) {
       ws.ping();
@@ -38,12 +43,12 @@ wss.on('connection', (ws, request) => {
   }, 30000);
 
   ws.on('pong', () => {
-    // Connection is alive
+    console.log('Received pong from client');
   });
 
   ws.on('close', () => {
+    console.log('Client disconnected');
     clearInterval(pingInterval);
-    console.log(`Client disconnected from room: ${roomId}`);
 
     if (roomId && userId && rooms.has(roomId)) {
       rooms.get(roomId).delete(userId);
@@ -61,10 +66,10 @@ wss.on('connection', (ws, request) => {
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message.toString());
-      console.log('Received message:', data.type);
+      console.log('Received message:', { type: data.type, roomId });
 
       if (data.type === 'join') {
-        roomId = request.url.split('/').pop();
+        roomId = request.url.split('/room/')[1];
         userId = data.data.userId;
         console.log(`Client ${userId} joining room ${roomId}`);
 
@@ -79,10 +84,17 @@ wss.on('connection', (ws, request) => {
             isConnected: true
           }));
 
-        broadcastToRoom(roomId, {
+        // Send immediate confirmation
+        ws.send(JSON.stringify({
           type: 'room_status',
           data: { participants: roomClients }
-        });
+        }));
+
+        // Then broadcast to others
+        broadcastToRoom(roomId, {
+          type: 'participant_joined',
+          data: { userId }
+        }, userId);
       } else if (roomId && rooms.has(roomId)) {
         broadcastToRoom(roomId, data, userId);
       }
@@ -93,7 +105,11 @@ wss.on('connection', (ws, request) => {
 
   ws.on('error', (error) => {
     console.error('WebSocket error:', error);
+    ws.terminate();
   });
+
+  // Send immediate connection acknowledgment
+  ws.send(JSON.stringify({ type: 'connected' }));
 });
 
 function broadcastToRoom(roomId, message, excludeUserId = null) {
@@ -115,19 +131,21 @@ function broadcastToRoom(roomId, message, excludeUserId = null) {
   });
 }
 
-// Start server
 const PORT = process.env.PORT || 3001;
+
 server.listen(PORT, () => {
-  console.log(`Server running on http://localhost:${PORT}`);
-  console.log(`WebSocket server ready on ws://localhost:${PORT}/room`);
+  console.log(`HTTP server running on http://localhost:${PORT}`);
+  console.log(`WebSocket server ready for connections`);
 });
 
-// Handle graceful shutdown
+// Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received');
-  server.close(() => {
-    console.log('Server closed');
-    process.exit(0);
+  wss.close(() => {
+    server.close(() => {
+      console.log('Server closed');
+      process.exit(0);
+    });
   });
 });
 
