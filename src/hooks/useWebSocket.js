@@ -9,10 +9,13 @@ export function useWebSocket(roomId) {
   const maxReconnectAttempts = 5;
 
   const getWebSocketUrl = useCallback(() => {
+    // In development, use the proxy
+    if (process.env.NODE_ENV === 'development') {
+      return `ws://${window.location.hostname}:3001/room/${roomId}`;
+    }
+    // In production, use relative path
     const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-    const host = window.location.hostname;
-    const port = '3001';
-    return `${protocol}//${host}:${port}/room/${roomId}`;
+    return `${protocol}//${window.location.host}/room/${roomId}`;
   }, [roomId]);
 
   const connect = useCallback(() => {
@@ -21,8 +24,10 @@ export function useWebSocket(roomId) {
         wsRef.current.close();
       }
 
-      const ws = new WebSocket(getWebSocketUrl());
-      console.log('Attempting to connect to:', getWebSocketUrl());
+      const wsUrl = getWebSocketUrl();
+      console.log('Connecting to WebSocket:', wsUrl);
+      
+      const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
         console.log('WebSocket connected successfully');
@@ -52,6 +57,7 @@ export function useWebSocket(roomId) {
         try {
           const message = JSON.parse(event.data);
           console.log('Received message:', message.type);
+          
           const handlers = messageHandlersRef.current[message.type] || [];
           handlers.forEach(handler => {
             try {
