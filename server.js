@@ -2,37 +2,43 @@ import { WebSocketServer } from 'ws';
 import express from 'express';
 import { createServer } from 'http';
 import cors from 'cors';
-import { fileURLToPath } from 'url';
-import { dirname } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
 
 const app = express();
-app.use(cors());
+app.use(cors({
+  origin: '*'
+}));
+
+const server = createServer(app);
 
 // Health check endpoint
 app.get('/health', (req, res) => {
   res.status(200).send('OK');
 });
 
-const server = createServer(app);
-
-// WebSocket server without path restriction
+// WebSocket server
 const wss = new WebSocketServer({ 
-  server,
-  clientTracking: true,
-  // Remove path restriction to handle all incoming connections
+  noServer: true,
+  clientTracking: true
 });
 
+// Room management
 const rooms = new Map();
 
-wss.on('listening', () => {
-  console.log('WebSocket server is listening');
+server.on('upgrade', (request, socket, head) => {
+  console.log('Upgrade request received:', request.url);
+
+  if (request.url.startsWith('/ws/room/')) {
+    wss.handleUpgrade(request, socket, head, (ws) => {
+      console.log('WebSocket connection established');
+      wss.emit('connection', ws, request);
+    });
+  } else {
+    socket.destroy();
+  }
 });
 
 wss.on('connection', (ws, request) => {
-  console.log('New WebSocket connection:', request.url);
+  console.log('New WebSocket connection established');
   let roomId = null;
   let userId = null;
 
@@ -43,7 +49,7 @@ wss.on('connection', (ws, request) => {
   }, 30000);
 
   ws.on('pong', () => {
-    console.log('Received pong from client');
+    console.log('Client is alive');
   });
 
   ws.on('close', () => {
@@ -66,10 +72,15 @@ wss.on('connection', (ws, request) => {
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message.toString());
-      console.log('Received message:', { type: data.type, roomId });
+      console.log('Received message:', data.type);
+
+      if (data.type === 'ping') {
+        ws.send(JSON.stringify({ type: 'pong' }));
+        return;
+      }
 
       if (data.type === 'join') {
-        roomId = request.url.split('/room/')[1];
+        roomId = request.url.split('/ws/room/')[1];
         userId = data.data.userId;
         console.log(`Client ${userId} joining room ${roomId}`);
 
@@ -84,13 +95,11 @@ wss.on('connection', (ws, request) => {
             isConnected: true
           }));
 
-        // Send immediate confirmation
         ws.send(JSON.stringify({
           type: 'room_status',
           data: { participants: roomClients }
         }));
 
-        // Then broadcast to others
         broadcastToRoom(roomId, {
           type: 'participant_joined',
           data: { userId }
@@ -100,15 +109,18 @@ wss.on('connection', (ws, request) => {
       }
     } catch (error) {
       console.error('Error processing message:', error);
+      ws.send(JSON.stringify({
+        type: 'error',
+        data: error.message
+      }));
     }
   });
 
   ws.on('error', (error) => {
     console.error('WebSocket error:', error);
-    ws.terminate();
   });
 
-  // Send immediate connection acknowledgment
+  // Send connection confirmation
   ws.send(JSON.stringify({ type: 'connected' }));
 });
 
@@ -134,11 +146,9 @@ function broadcastToRoom(roomId, message, excludeUserId = null) {
 const PORT = process.env.PORT || 3001;
 
 server.listen(PORT, () => {
-  console.log(`HTTP server running on http://localhost:${PORT}`);
-  console.log(`WebSocket server ready for connections`);
+  console.log(`Server running on http://localhost:${PORT}`);
 });
 
-// Graceful shutdown
 process.on('SIGTERM', () => {
   console.log('SIGTERM received');
   wss.close(() => {
