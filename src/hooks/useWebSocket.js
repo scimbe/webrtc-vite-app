@@ -8,15 +8,12 @@ export function useWebSocket(roomId) {
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
 
-  // Always use the clean roomId
-  const cleanRoomId = roomId.includes('ws://') ? 
-    roomId.split('/').pop() : 
-    roomId;
-
   const getWebSocketUrl = useCallback(() => {
-    console.log('Creating WebSocket URL for room:', cleanRoomId);
-    return `ws://localhost:3001/room/${cleanRoomId}`;
-  }, [cleanRoomId]);
+    // Nutze die Vite Proxy-Konfiguration
+    const wsUrl = `${window.location.protocol === 'https:' ? 'wss:' : 'ws:'}//${window.location.host}/ws/room/${roomId}`;
+    console.log('WebSocket URL:', wsUrl);
+    return wsUrl;
+  }, [roomId]);
 
   const connect = useCallback(() => {
     if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
@@ -25,33 +22,31 @@ export function useWebSocket(roomId) {
     }
 
     try {
-      if (wsRef.current?.readyState === WebSocket.OPEN) {
+      if (wsRef.current) {
         wsRef.current.close();
+        wsRef.current = null;
       }
 
-      const wsUrl = getWebSocketUrl();
-      console.log('Connection attempt to:', wsUrl);
-      const ws = new WebSocket(wsUrl);
+      const ws = new WebSocket(getWebSocketUrl());
+      console.log('Creating new WebSocket connection...');
 
       ws.onopen = () => {
-        console.log('WebSocket connected successfully');
+        console.log('WebSocket connected');
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
       };
 
       ws.onclose = (event) => {
-        console.log('WebSocket closed:', event.code);
+        console.log('WebSocket closed:', event.code, event.reason);
         setIsConnected(false);
         wsRef.current = null;
 
-        if (!event.wasClean) {
+        if (!event.wasClean && reconnectAttemptsRef.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
           reconnectAttemptsRef.current++;
-          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
-            console.log(`Reconnecting in ${delay}ms... Attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts}`);
-            setTimeout(connect, delay);
-          }
+          console.log(`Reconnecting in ${delay}ms... Attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts}`);
+          setTimeout(connect, delay);
         }
       };
 
@@ -64,6 +59,12 @@ export function useWebSocket(roomId) {
         try {
           const message = JSON.parse(event.data);
           console.log('Received message:', message.type);
+          
+          if (message.type === 'error') {
+            console.error('Server error:', message.data);
+            return;
+          }
+
           const handlers = messageHandlersRef.current[message.type] || [];
           handlers.forEach(handler => {
             try {
@@ -79,7 +80,15 @@ export function useWebSocket(roomId) {
 
       wsRef.current = ws;
 
+      // Ping zur Verbindungsüberprüfung
+      const pingInterval = setInterval(() => {
+        if (ws.readyState === WebSocket.OPEN) {
+          ws.send(JSON.stringify({ type: 'ping' }));
+        }
+      }, 30000);
+
       return () => {
+        clearInterval(pingInterval);
         if (ws.readyState === WebSocket.OPEN) {
           ws.close();
         }
@@ -93,7 +102,7 @@ export function useWebSocket(roomId) {
   }, [getWebSocketUrl]);
 
   useEffect(() => {
-    console.log('Initiating WebSocket connection for room:', roomId);
+    console.log('Initializing WebSocket connection...');
     const cleanup = connect();
     
     return () => {
@@ -103,7 +112,7 @@ export function useWebSocket(roomId) {
         wsRef.current = null;
       }
     };
-  }, [connect, roomId]);
+  }, [connect]);
 
   const sendMessage = useCallback((message) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
