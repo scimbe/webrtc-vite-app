@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback, memo } from 'react';
 import { VideoStream } from './VideoStream';
 import { ControlPanel } from './ControlPanel';
 
-export const VideoChat = ({
+export const VideoChat = memo(({ 
   peerConnection,
   localStream,
   remoteStream,
@@ -16,28 +16,46 @@ export const VideoChat = ({
   const [isMuted, setIsMuted] = useState(false);
   const [isVideoOff, setIsVideoOff] = useState(false);
   
-  useEffect(() => {
+  const handleAudioToggle = useCallback(() => {
     if (localStream) {
       const audioTracks = localStream.getAudioTracks();
+      const newMutedState = !isMuted;
       audioTracks.forEach(track => {
-        track.enabled = !isMuted;
+        track.enabled = !newMutedState;
       });
+      setIsMuted(newMutedState);
     }
-  }, [isMuted, localStream]);
+  }, [localStream, isMuted]);
+
+  const handleVideoToggle = useCallback(() => {
+    if (localStream) {
+      const videoTracks = localStream.getVideoTracks();
+      const newVideoOffState = !isVideoOff;
+      videoTracks.forEach(track => {
+        track.enabled = !newVideoOffState;
+      });
+      setIsVideoOff(newVideoOffState);
+    }
+  }, [localStream, isVideoOff]);
 
   useEffect(() => {
     if (localStream) {
+      const audioTracks = localStream.getAudioTracks();
       const videoTracks = localStream.getVideoTracks();
-      videoTracks.forEach(track => {
-        track.enabled = !isVideoOff;
-      });
+
+      return () => {
+        audioTracks.forEach(track => track.stop());
+        videoTracks.forEach(track => track.stop());
+      };
     }
-  }, [isVideoOff, localStream]);
+  }, [localStream]);
+
+  const remoteParticipant = participants.find(p => p.id !== roomConfig.userId);
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-slate-900 to-slate-800 p-4 relative">
       <div className="max-w-7xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-4 mb-20">
-        {/* Lokaler Stream */}
+        {/* Local Stream */}
         <div className="relative aspect-video">
           <VideoStream
             stream={localStream}
@@ -54,7 +72,7 @@ export const VideoChat = ({
             <VideoStream
               stream={remoteStream}
               isMuted={false}
-              label={participants.find(p => p.id !== roomConfig.userId)?.name || 'Remote User'}
+              label={remoteParticipant?.name || 'Remote User'}
               isLocal={false}
             />
           ) : (
@@ -72,8 +90,8 @@ export const VideoChat = ({
       <ControlPanel
         isMuted={isMuted}
         isVideoOff={isVideoOff}
-        onToggleMute={() => setIsMuted(!isMuted)}
-        onToggleVideo={() => setIsVideoOff(!isVideoOff)}
+        onToggleMute={handleAudioToggle}
+        onToggleVideo={handleVideoToggle}
         onLeave={() => window.location.href = '/'}
         isHost={roomConfig.isHost}
         participants={participants}
@@ -81,4 +99,6 @@ export const VideoChat = ({
       />
     </div>
   );
-};
+});
+
+VideoChat.displayName = 'VideoChat';
