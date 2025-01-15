@@ -19,7 +19,7 @@ export function useWebSocket(roomId) {
       }
 
       const wsUrl = getWebSocketUrl();
-      console.log('Attempting to connect to:', wsUrl);
+      console.log('Connection attempt to:', wsUrl);
       const ws = new WebSocket(wsUrl);
 
       ws.onopen = () => {
@@ -36,6 +36,7 @@ export function useWebSocket(roomId) {
         if (!event.wasClean && reconnectAttemptsRef.current < maxReconnectAttempts) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
           reconnectAttemptsRef.current++;
+          console.log(`Reconnecting in ${delay}ms... Attempt ${reconnectAttemptsRef.current}`);
           setTimeout(connect, delay);
         }
       };
@@ -77,7 +78,9 @@ export function useWebSocket(roomId) {
   }, [getWebSocketUrl]);
 
   useEffect(() => {
+    console.log('Initiating WebSocket connection for room:', roomId);
     const cleanup = connect();
+    
     return () => {
       cleanup();
       if (wsRef.current) {
@@ -85,7 +88,7 @@ export function useWebSocket(roomId) {
         wsRef.current = null;
       }
     };
-  }, [connect]);
+  }, [connect, roomId]);
 
   const sendMessage = useCallback((message) => {
     if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) {
