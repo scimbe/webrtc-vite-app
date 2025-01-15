@@ -8,11 +8,22 @@ export function useWebSocket(roomId) {
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
 
+  // Always use the clean roomId
+  const cleanRoomId = roomId.includes('ws://') ? 
+    roomId.split('/').pop() : 
+    roomId;
+
   const getWebSocketUrl = useCallback(() => {
-    return `ws://localhost:3001/room/${roomId}`;
-  }, [roomId]);
+    console.log('Creating WebSocket URL for room:', cleanRoomId);
+    return `ws://localhost:3001/room/${cleanRoomId}`;
+  }, [cleanRoomId]);
 
   const connect = useCallback(() => {
+    if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
+      console.log('Max reconnection attempts reached');
+      return () => {};
+    }
+
     try {
       if (wsRef.current?.readyState === WebSocket.OPEN) {
         wsRef.current.close();
@@ -32,12 +43,15 @@ export function useWebSocket(roomId) {
       ws.onclose = (event) => {
         console.log('WebSocket closed:', event.code);
         setIsConnected(false);
+        wsRef.current = null;
 
-        if (!event.wasClean && reconnectAttemptsRef.current < maxReconnectAttempts) {
+        if (!event.wasClean) {
           const delay = Math.min(1000 * Math.pow(2, reconnectAttemptsRef.current), 10000);
           reconnectAttemptsRef.current++;
-          console.log(`Reconnecting in ${delay}ms... Attempt ${reconnectAttemptsRef.current}`);
-          setTimeout(connect, delay);
+          if (reconnectAttemptsRef.current < maxReconnectAttempts) {
+            console.log(`Reconnecting in ${delay}ms... Attempt ${reconnectAttemptsRef.current}/${maxReconnectAttempts}`);
+            setTimeout(connect, delay);
+          }
         }
       };
 
@@ -49,6 +63,7 @@ export function useWebSocket(roomId) {
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
+          console.log('Received message:', message.type);
           const handlers = messageHandlersRef.current[message.type] || [];
           handlers.forEach(handler => {
             try {
