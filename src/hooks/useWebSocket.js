@@ -8,29 +8,45 @@ export function useWebSocket(roomId) {
   const reconnectAttemptsRef = useRef(0);
   const maxReconnectAttempts = 5;
 
+  // URL Konstruktion
   const getWebSocketUrl = useCallback(() => {
-    // Direkte Verbindung zum WebSocket-Server
-    return `ws://localhost:3001/ws/room/${roomId}`;
+    const isSecure = window.location.protocol === 'https:';
+    const protocol = isSecure ? 'wss:' : 'ws:';
+    const host = 'localhost:3001';  // Für Entwicklung
+    const url = `${protocol}//${host}/ws/room/${roomId}`;
+    console.log('WebSocket URL:', url);
+    return url;
   }, [roomId]);
 
   const connect = useCallback(() => {
     if (reconnectAttemptsRef.current >= maxReconnectAttempts) {
-      console.log('Max reconnection attempts reached');
+      console.log('Maximum reconnection attempts reached');
+      setError(new Error('Konnte keine Verbindung herstellen'));
       return () => {};
     }
 
     try {
+      // Bestehende Verbindung schließen
       if (wsRef.current) {
+        console.log('Closing existing connection');
         wsRef.current.close();
         wsRef.current = null;
       }
 
-      const wsUrl = getWebSocketUrl();
-      console.log('Connecting to:', wsUrl);
-      const ws = new WebSocket(wsUrl);
+      console.log(`Connecting to WebSocket (Attempt ${reconnectAttemptsRef.current + 1}/${maxReconnectAttempts})`);
+      const ws = new WebSocket(getWebSocketUrl());
+      
+      // Verbindungs-Timeout
+      const connectionTimeout = setTimeout(() => {
+        if (ws.readyState !== WebSocket.OPEN) {
+          console.log('Connection timeout');
+          ws.close();
+        }
+      }, 5000);
 
       ws.onopen = () => {
         console.log('WebSocket connected successfully');
+        clearTimeout(connectionTimeout);
         setIsConnected(true);
         setError(null);
         reconnectAttemptsRef.current = 0;
@@ -38,6 +54,7 @@ export function useWebSocket(roomId) {
 
       ws.onclose = (event) => {
         console.log('WebSocket closed:', event.code, event.reason);
+        clearTimeout(connectionTimeout);
         setIsConnected(false);
         wsRef.current = null;
 
@@ -51,13 +68,14 @@ export function useWebSocket(roomId) {
 
       ws.onerror = (event) => {
         console.error('WebSocket error:', event);
+        // Fehler nicht setzen, da onclose folgt
       };
 
       ws.onmessage = (event) => {
         try {
           const message = JSON.parse(event.data);
-          console.log('Received message:', message);
-          
+          console.log('Received message:', message.type);
+
           if (message.type === 'error') {
             console.error('Server error:', message.data);
             return;
@@ -87,6 +105,7 @@ export function useWebSocket(roomId) {
 
       return () => {
         clearInterval(pingInterval);
+        clearTimeout(connectionTimeout);
         if (ws.readyState === WebSocket.OPEN) {
           ws.close();
         }
