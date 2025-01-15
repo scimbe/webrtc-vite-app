@@ -4,7 +4,7 @@ import { parse } from 'url';
 
 const server = createServer((req, res) => {
   const { pathname } = parse(req.url);
-
+  
   if (pathname === '/health') {
     res.writeHead(200);
     res.end('OK');
@@ -16,28 +16,19 @@ const server = createServer((req, res) => {
 });
 
 const wss = new WebSocketServer({
-  noServer: true,
+  server,
+  path: '/room',
   perMessageDeflate: false,
-  maxPayload: 50 * 1024 * 1024 // 50MB
+  maxPayload: 50 * 1024 * 1024
 });
 
 const rooms = new Map();
 
-server.on('upgrade', (request, socket, head) => {
-  const { pathname } = parse(request.url);
-
-  if (pathname === '/ws') {
-    wss.handleUpgrade(request, socket, head, (ws) => {
-      wss.emit('connection', ws, request);
-    });
-  } else {
-    socket.destroy();
-  }
-});
-
 wss.on('connection', (ws, request) => {
-  console.log('New client connected');
-  let roomId = '';
+  const { pathname } = parse(request.url);
+  const roomId = pathname.split('/').pop();
+  
+  console.log(`Client connecting to room: ${roomId}`);
   let userId = '';
 
   const heartbeat = {
@@ -50,30 +41,36 @@ wss.on('connection', (ws, request) => {
   };
 
   ws.on('pong', () => {
-    // Reset connection timeout on pong
     clearTimeout(heartbeat.timeout);
     heartbeat.timeout = setTimeout(() => {
       ws.terminate();
     }, 35000);
   });
 
-  ws.on('ping', () => {
-    ws.pong();
+  ws.on('close', () => {
+    console.log(`Client disconnected from room: ${roomId}`);
+    clearInterval(heartbeat.ping);
+    clearTimeout(heartbeat.timeout);
+
+    if (roomId && userId && rooms.has(roomId)) {
+      rooms.get(roomId).delete(userId);
+      if (rooms.get(roomId).size === 0) {
+        rooms.delete(roomId);
+      } else {
+        broadcastToRoom(roomId, {
+          type: 'participant_left',
+          data: { userId }
+        });
+      }
+    }
   });
 
   ws.on('message', (message) => {
     try {
       const data = JSON.parse(message.toString());
-      
-      if (data.type === 'ping') {
-        ws.send(JSON.stringify({ type: 'pong' }));
-        return;
-      }
-
-      console.log('Received message:', data.type);
+      console.log('Received message:', { type: data.type, roomId });
 
       if (data.type === 'join') {
-        roomId = data.data.roomId;
         userId = data.data.userId;
 
         if (!rooms.has(roomId)) {
@@ -99,24 +96,6 @@ wss.on('connection', (ws, request) => {
     }
   });
 
-  ws.on('close', () => {
-    console.log('Client disconnected');
-    clearInterval(heartbeat.ping);
-    clearTimeout(heartbeat.timeout);
-
-    if (roomId && rooms.has(roomId)) {
-      rooms.get(roomId).delete(userId);
-      if (rooms.get(roomId).size === 0) {
-        rooms.delete(roomId);
-      } else {
-        broadcastToRoom(roomId, {
-          type: 'participant_left',
-          data: { userId }
-        });
-      }
-    }
-  });
-
   ws.on('error', (error) => {
     console.error('WebSocket error:', error);
   });
@@ -128,14 +107,14 @@ function broadcastToRoom(roomId, message, excludeUserId = null) {
   const room = rooms.get(roomId);
   const messageStr = JSON.stringify(message);
 
-  room.forEach((client, userId) => {
-    if (userId !== excludeUserId && client.readyState === WebSocketServer.OPEN) {
+  room.forEach((client, clientId) => {
+    if (clientId !== excludeUserId && client.readyState === WebSocketServer.OPEN) {
       try {
         client.send(messageStr);
       } catch (error) {
-        console.error(`Error sending to client ${userId}:`, error);
+        console.error(`Error sending to client ${clientId}:`, error);
         client.terminate();
-        room.delete(userId);
+        room.delete(clientId);
       }
     }
   });
